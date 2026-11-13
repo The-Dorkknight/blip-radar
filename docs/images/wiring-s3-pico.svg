@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="760" viewBox="0 0 1040 760" font-family="DejaVu Sans, Arial, sans-serif">
+<rect width="1040" height="760" fill="#06120b"/>
+<text x="20" y="34" fill="#39ff8a" font-size="22" font-weight="bold">Blip wiring — Waveshare ESP32-S3-Pico</text>
+<text x="20" y="56" fill="#7fb597" font-size="13">Pins from firmware/platformio.ini env:s3-pico.</text>
+<text x="20" y="74" fill="#7fb597" font-size="13">GPIO11/12 sit at Pico positions GP0/GP1, GPIO13–16 at GP2–GP5, GPIO17/18 at GP6/GP7, GPIO7 at A1 — check Waveshare's pinout.</text>
+<rect x="400" y="100" width="250" height="400" rx="10" fill="#0b1d12" stroke="#39ff8a" stroke-width="2"/>
+<text x="412" y="126" fill="#39ff8a" font-size="16" font-weight="bold">Waveshare ESP32-S3-Pico</text>
+<text x="412" y="150" fill="#d9f5e3" font-size="14">USB-C: power + flashing</text>
+<text x="412" y="170" fill="#d9f5e3" font-size="14">GPIO12  ← radar TX</text>
+<text x="412" y="190" fill="#d9f5e3" font-size="14">GPIO11  → radar RX</text>
+<text x="412" y="210" fill="#d9f5e3" font-size="14">GPIO17  SDA</text>
+<text x="412" y="230" fill="#d9f5e3" font-size="14">GPIO18  SCL</text>
+<text x="412" y="250" fill="#d9f5e3" font-size="14">GPIO7  ADC ← MAX4466 OUT</text>
+<text x="412" y="270" fill="#d9f5e3" font-size="14">GPIO16  earphones (delta-sigma)</text>
+<text x="412" y="290" fill="#d9f5e3" font-size="14">GPIO13/14/15  I2S BCLK/WS/DIN</text>
+<text x="412" y="310" fill="#d9f5e3" font-size="14">5V / VBUS → radar, CDM324</text>
+<text x="412" y="330" fill="#d9f5e3" font-size="14">3V3 → OLED, MAX4466</text>
+<text x="412" y="350" fill="#d9f5e3" font-size="14">GND common to all</text>
+<text x="412" y="370" fill="#d9f5e3" font-size="14">(no status LED here)</text>
+<text x="412" y="390" fill="#d9f5e3" font-size="14"></text>
+<rect x="30" y="100" width="250" height="150" rx="10" fill="#0b1d12" stroke="#5ad0ff" stroke-width="2"/>
+<text x="42" y="126" fill="#5ad0ff" font-size="16" font-weight="bold">Ai-Thinker RD-03D</text>
+<text x="42" y="150" fill="#d9f5e3" font-size="14">5V  (≥200 mA, ripple <100 mV)</text>
+<text x="42" y="170" fill="#d9f5e3" font-size="14">GND</text>
+<text x="42" y="190" fill="#d9f5e3" font-size="14">TX  3.3 V logic, 256000 8N1</text>
+<text x="42" y="210" fill="#d9f5e3" font-size="14">RX</text>
+<rect x="30" y="300" width="250" height="140" rx="10" fill="#0b1d12" stroke="#ffd34d" stroke-width="2"/>
+<text x="42" y="326" fill="#ffd34d" font-size="16" font-weight="bold">SSD1306 OLED (optional)</text>
+<text x="42" y="350" fill="#d9f5e3" font-size="14">0.91" 128×32 or 0.96" 128×64</text>
+<text x="42" y="370" fill="#d9f5e3" font-size="14">VCC → 3V3,  GND</text>
+<text x="42" y="390" fill="#d9f5e3" font-size="14">SDA, SCL  (I2C address 0x3C)</text>
+<text x="42" y="410" fill="#d9f5e3" font-size="14">Pick the size in Settings</text>
+<rect x="760" y="100" width="260" height="170" rx="10" fill="#0b1d12" stroke="#ff8fd6" stroke-width="2"/>
+<text x="772" y="126" fill="#ff8fd6" font-size="16" font-weight="bold">Stetho (optional)</text>
+<text x="772" y="150" fill="#d9f5e3" font-size="14">CDM324 / HB100 IF pin</text>
+<text x="772" y="170" fill="#d9f5e3" font-size="14">→ MAX4466 board, mic and</text>
+<text x="772" y="190" fill="#d9f5e3" font-size="14">   mic bias resistor removed</text>
+<text x="772" y="210" fill="#d9f5e3" font-size="14">see hardware/max4466-mod.md</text>
+<text x="772" y="230" fill="#d9f5e3" font-size="14">NOT a medical device</text>
+<rect x="760" y="300" width="260" height="170" rx="10" fill="#0b1d12" stroke="#c9a0ff" stroke-width="2"/>
+<text x="772" y="326" fill="#c9a0ff" font-size="16" font-weight="bold">Audio out (optional)</text>
+<text x="772" y="350" fill="#d9f5e3" font-size="14">Earphones: GPIO16 → 470 Ω</text>
+<text x="772" y="370" fill="#d9f5e3" font-size="14">  → 100 nF to GND → 220 µF</text>
+<text x="772" y="390" fill="#d9f5e3" font-size="14">  → 3.5 mm tip + ring</text>
+<text x="772" y="410" fill="#d9f5e3" font-size="14">I2S amp: MAX98357A board,</text>
+<text x="772" y="430" fill="#d9f5e3" font-size="14">  VIN 5 V, 4–8 Ω speaker</text>
+<rect x="760" y="500" width="260" height="130" rx="10" fill="#0b1d12" stroke="#39ff8a" stroke-width="2"/>
+<text x="772" y="526" fill="#39ff8a" font-size="16" font-weight="bold">Old phone</text>
+<text x="772" y="550" fill="#d9f5e3" font-size="14">Join Wi-Fi: Blip-Radar</text>
+<text x="772" y="570" fill="#d9f5e3" font-size="14">password: blipblip</text>
+<text x="772" y="590" fill="#d9f5e3" font-size="14">open http://192.168.4.1/</text>
+<text x="772" y="610" fill="#d9f5e3" font-size="14">(the captive portal opens it)</text>
+<path d="M280,140 C340.0,140 340.0,140 400,140" fill="none" stroke="#ff5c5c" stroke-width="3"/>
+<text x="310.0" y="134.0" fill="#ff5c5c" font-size="12" text-anchor="middle">5 V</text>
+<path d="M280,164 C340.0,164 340.0,164 400,164" fill="none" stroke="#9aa" stroke-width="3"/>
+<text x="370.0" y="158.0" fill="#9aa" font-size="12" text-anchor="middle">GND</text>
+<path d="M280,188 C340.0,188 340.0,188 400,188" fill="none" stroke="#5ad0ff" stroke-width="3"/>
+<text x="328.0" y="182.0" fill="#5ad0ff" font-size="12" text-anchor="middle">TX → GPIO12</text>
+<path d="M280,212 C340.0,212 340.0,212 400,212" fill="none" stroke="#5ad0ff" stroke-width="3"/>
+<text x="352.0" y="226.0" fill="#5ad0ff" font-size="12" text-anchor="middle">RX ← GPIO11</text>
+<path d="M280,365 C340.0,365 340.0,250 400,250" fill="none" stroke="#ffd34d" stroke-width="3"/>
+<text x="340.0" y="297.5" fill="#ffd34d" font-size="12" text-anchor="middle">SDA → GPIO17</text>
+<path d="M280,385 C340.0,385 340.0,270 400,270" fill="none" stroke="#ffd34d" stroke-width="3"/>
+<text x="340.0" y="343.5" fill="#ffd34d" font-size="12" text-anchor="middle">SCL → GPIO18</text>
+<path d="M650,230 C705.0,230 705.0,185 760,185" fill="none" stroke="#ff8fd6" stroke-width="3"/>
+<text x="699.5" y="197.75" fill="#ff8fd6" font-size="12" text-anchor="middle">OUT→GPIO7</text>
+<path d="M650,250 C705.0,250 705.0,205 760,205" fill="none" stroke="#ff5c5c" stroke-width="3"/>
+<text x="699.5" y="247.75" fill="#ff5c5c" font-size="12" text-anchor="middle">power</text>
+<path d="M650,330 C705.0,330 705.0,380 760,380" fill="none" stroke="#c9a0ff" stroke-width="3"/>
+<text x="699.5" y="340.5" fill="#c9a0ff" font-size="12" text-anchor="middle">audio</text>
+<path d="M650,480 C 700,480 700,600 760,600" fill="none" stroke="#39ff8a" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="705" y="560" fill="#39ff8a" font-size="12" text-anchor="middle">Wi-Fi hotspot</text>
+<text x="20" y="700" fill="#7fb597" font-size="12">Keep the radar wires short. 5 V from the ESP32 board's USB/5V pin is fine for a bench test; never power the radar from 3V3.</text>
+<text x="20" y="720" fill="#7fb597" font-size="12">Radar TX/RX are 3.3 V logic, so no level shifter is needed. OLED and amp are optional: leave them off and Blip still works.</text>
+<text x="20" y="740" fill="#7fb597" font-size="12">Firmware compiles for this board; not verified on real hardware yet (v0.2.0-wip). Drawn by tools/draw_illustrations.py.</text>
+</svg>

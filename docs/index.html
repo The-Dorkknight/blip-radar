@@ -1,0 +1,124 @@
+<!doctype html>
+<!--
+  Blip — GitHub Pages site (docs/index.html). Self-contained.
+  Required Notice: Copyright Matthew Armstrong (https://github.com/The-Dorkknight)
+  Licensed under the PolyForm Noncommercial License 1.0.0. No warranty.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blip — one ESP32, one radar, an old phone</title>
+<meta name="description" content="Blip: RD-03D 24 GHz radar on an ESP32-C3 Super Mini or ESP32-S3-Pico with a phone web UI. Source-available · Non-commercial. Work in progress.">
+<link rel="icon" href="favicon-64.png"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+:root{--bg:#f4f8f5;--panel:#ffffff;--line:#cfe3d6;--ph:#0f8a46;--ph2:#0b6b36;--txt:#102017;--dim:#4a6b58;--warn-bg:#fff3d6;--warn:#7a5200}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#06120b;--panel:#0b1d12;--line:#1b3a26;--ph:#39ff8a;--ph2:#1f9c56;--txt:#d9f5e3;--dim:#7fb597;--warn-bg:#3a2a00;--warn:#ffd27a}}
+:root[data-theme=dark]{--bg:#06120b;--panel:#0b1d12;--line:#1b3a26;--ph:#39ff8a;--ph2:#1f9c56;--txt:#d9f5e3;--dim:#7fb597;--warn-bg:#3a2a00;--warn:#ffd27a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+.wip{background:var(--warn-bg);color:var(--warn);text-align:center;padding:10px 16px;font-weight:600;letter-spacing:.03em}
+header.hero{display:grid;grid-template-columns:1fr;gap:20px;align-items:center;padding:36px 0 20px}
+@media(min-width:720px){header.hero{grid-template-columns:1.2fr 1fr}}
+h1{font-size:44px;margin:0;color:var(--ph);letter-spacing:.06em}h1 small{font-size:16px;color:var(--dim);letter-spacing:0;display:block;font-weight:400}
+.lead{font-size:19px;color:var(--txt)}
+.btns a{display:inline-block;margin:6px 8px 6px 0;padding:10px 16px;border-radius:8px;border:1px solid var(--ph2);color:var(--ph);text-decoration:none;font-weight:600}
+.btns a.primary{background:var(--ph);color:#fff}@media (prefers-color-scheme:dark){.btns a.primary{color:#06120b}}
+.hero img.shot{width:100%;max-width:300px;height:auto;border-radius:16px;border:1px solid var(--line);display:block;margin:0 auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{margin:0 0 6px;font-size:17px;color:var(--ph)}.card p{margin:0;color:var(--dim);font-size:15px}
+h2{color:var(--ph);margin:34px 0 10px;font-size:26px}
+img.wide{width:100%;height:auto;border-radius:12px;border:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:15px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{color:var(--dim);font-weight:600}
+ol li{margin:6px 0}code{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px}
+.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.shots img{width:100%;height:auto;border-radius:12px;border:1px solid var(--line)}
+footer{margin:40px 0 20px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:14px}
+#hw{display:none}#hw.show{display:block}
+</style>
+</head>
+<body>
+<div class="wip">WORK IN PROGRESS: MANY FEATURES MAY BE BROKEN · v0.2.2-wip · firmware compiles, not yet run on real hardware</div>
+<div class="wrap">
+<header class="hero">
+  <div>
+    <h1><img src="favicon-64.png" alt="" width="40" height="40" style="vertical-align:-6px;margin-right:8px">BLIP <small>one ESP32 · one 24 GHz radar · an old phone as the screen</small></h1>
+    <p class="lead">An Ai-Thinker RD-03D tracks up to three moving people. An ESP32-C3 Super Mini (or Waveshare ESP32-S3-Pico) reads it, runs a Wi-Fi hotspot and serves a radar scope to whatever phone joins. Optional 0.9x" OLED mirror. Optional "Stetho" channel: a CW Doppler module through a modded MAX4466 mic board, cleaned up on the ESP32 and played live to the phone, earphones or a speaker.</p>
+    <p class="btns"><a class="primary" id="repoLink" href="https://github.com/The-Dorkknight/blip-radar">Source on GitHub</a><a id="relLink" href="https://github.com/The-Dorkknight/blip-radar/releases">Releases</a><a id="notesLink" href="https://github.com/The-Dorkknight/blip-radar/blob/main/DESIGN_NOTES.md">Research notes</a></p>
+  </div>
+  <img class="shot" src="images/ui-scope.webp" alt="Blip scope on a phone (simulator)">
+</header>
+
+<div class="cards">
+  <div class="card"><h3>No second MCU</h3><p>The original design used a XIAO plus an Arduino GIGA with a display shield. Here the phone draws.</p></div>
+  <div class="card"><h3>Works anywhere</h3><p>The node is its own hotspot with a captive portal. No router, no internet, no app.</p></div>
+  <div class="card"><h3>Two boards, one firmware</h3><p>ESP32-C3 Super Mini or ESP32-S3-Pico; pick them in the Blip Flasher and press one button.</p></div>
+  <div class="card"><h3>Honest about the stethoscope</h3><p>The RD-03D can't be one (its DSP is sealed in the chip). A £3 CDM324/HB100 can. Both documented.</p></div>
+</div>
+
+<h2>What does not exist yet</h2>
+<table>
+<tr><th>Thing</th><th>State</th></tr>
+<tr><td>Firmware on real hardware</td><td><b>Compiles</b> for both boards, <b>not yet flashed</b></td></tr>
+<tr><td>CDM324 + MAX4466 front end</td><td>Documented, not built; the DSP is tested on a synthetic scene</td></tr>
+<tr><td>Earphone / I2S amp outputs</td><td>Compile, not heard yet</td></tr>
+<tr><td>Smart target filter</td><td>Experimental, opt-in; tested on synthetic scenes only</td></tr>
+<tr><td>Enclosure, battery</td><td>None</td></tr>
+<tr><td>Joining home Wi-Fi, mDNS</td><td>Not yet (hotspot only)</td></tr>
+</table>
+
+<h2>Screens (from the simulator)</h2>
+<div class="shots">
+  <img src="images/ui-scope.webp" alt="Scope"><img src="images/ui-targets.webp" alt="Targets"><img src="images/ui-stetho.webp" alt="Stetho"><img src="images/ui-stetho-node.webp" alt="Stetho clean-up settings"><img src="images/ui-settings.webp" alt="Settings">
+</div>
+
+<h2>Wiring</h2>
+<img class="wide" src="images/wiring-c3-supermini.webp" alt="Wiring for the ESP32-C3 Super Mini">
+<p></p>
+<img class="wide" src="images/wiring-s3-pico.webp" alt="Wiring for the Waveshare ESP32-S3-Pico">
+
+<h2>Why 24 GHz, and why a tracker can't hear a heart</h2>
+<img class="wide" src="images/doppler-physics.webp" alt="Phase swing chart">
+<p>A heartbeat moves the chest about 0.4 mm. At 24 GHz that is a 0.4 rad phase wobble in the reflected wave — visible on a raw Doppler mixer output, invisible to a chip that only reports tracked targets in whole centimetres per second. Hence the Stetho channel: a separate CW Doppler module whose IF pin goes through a MAX4466 board into the ESP32's ADC.</p>
+<img class="wide" src="images/max4466-mod.webp" alt="CDM324 into a modded MAX4466 board, DC warning and earphone filter">
+<h2>Clean-up on the ESP32</h2>
+<p>A bump gate ducks knocks by 30 dB from their leading edge (4 ms look-ahead), a preset EQ lifts heart, lung or throat sounds, a 4-band noise suppressor cuts the hiss and an AGC keeps the level steady — fixed-point, because the C3 has no FPU. On a synthetic test scene, knocks end up ~38 dB down relative to the heart sounds.</p>
+<img class="wide" src="images/dsp-demo.webp" alt="DSP before and after on a synthetic scene">
+<p><b>RD-03D + CDM324 together?</b> Both use 24 GHz; the RD-03D's sweep passes the CDM324's frequency and buzzes in its audio. Use an HB100 (10.5 GHz) for the Stetho, or switch the radar off while listening.</p>
+
+<p><a href="Blip-manual.pdf"><b>📘 Read the manual (PDF)</b></a> — setup, how it works, design notes and research, wiring, in one illustrated file.</p>
+<h2>Install</h2>
+<ol>
+  <li>Download the release zip, unzip it.</li>
+  <li><b>Try it first without hardware:</b> double-click <code>Blip-Linux.sh</code> / <code>Blip-Windows.bat</code> / <code>Blip-Mac.command</code>. Python 3 is all it needs.</li>
+  <li><b>Flash:</b> plug the board in, open the <b>Flash</b> tab on the same page, pick the board, radar and port, press <b>Flash firmware</b>. (The first run installs PlatformIO into a local folder; needs the internet and Git.)</li>
+  <li>Wire the radar (5V, GND, TX→GPIO20, RX←GPIO21 on the C3; GPIO12/11 on the S3-Pico).</li>
+  <li>On the phone join Wi-Fi <code>Blip-Radar</code>, password <code>blipblip</code>, open <code>http://192.168.4.1/</code>.</li>
+</ol>
+
+<section id="hw">
+<h2>Real hardware</h2>
+<div class="shots">
+  <img src="images/unit.jpg" alt="The unit" onerror="this.remove()"><img src="images/unit-2.jpg" alt="The unit, second view" onerror="this.remove()"><img src="images/real-feed.jpg" alt="Real radar feed" onerror="this.remove()">
+</div>
+</section>
+
+<footer>
+  <p>Required Notice: Copyright Matthew Armstrong (<a id="ownerLink" href="https://github.com/The-Dorkknight">github.com/The-Dorkknight</a>). Licensed under the PolyForm Noncommercial License 1.0.0 — source-available, non-commercial. Provided as-is, no warranty, no liability. <b>Not a medical device.</b> Radar sees motion through thin walls: respect others' privacy and local 24 GHz rules. Inspired by Stevee87's Arduino-ESP32-Radarproject (MIT); no code copied.</p>
+</footer>
+</div>
+<script>
+(function(){
+  // work out owner/repo from the Pages URL so links survive renames/forks
+  var h=location.hostname.match(/^([^.]+)\.github\.io$/),parts=location.pathname.split('/').filter(Boolean);
+  var owner=h?h[1]:'The-Dorkknight',repo=(h&&parts[0])?parts[0]:'blip-radar';
+  var base='https://github.com/'+owner+'/'+repo;
+  document.getElementById('repoLink').href=base;document.getElementById('relLink').href=base+'/releases';
+  document.getElementById('notesLink').href=base+'/blob/main/DESIGN_NOTES.md';document.getElementById('ownerLink').href='https://github.com/'+owner;
+  // show the hardware section only if at least one photo exists
+  ['unit.jpg','unit-2.jpg','real-feed.jpg'].forEach(function(n){var i=new Image();i.onload=function(){document.getElementById('hw').classList.add('show');};i.src='images/'+n;});
+})();
+</script>
+</body>
+</html>

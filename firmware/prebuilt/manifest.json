@@ -1,0 +1,51 @@
+{
+  "app": "Blip",
+  "version": "0.2.2-wip",
+  "built": "2026-11-13 00:26",
+  "source": "e11b93433eb161d475a1a17ef35ef9864b841ff17ab9ab07d157185c9c6642f3",
+  "images": {
+    "c3-supermini": {
+      "file": "blip-c3-supermini-full.bin",
+      "chip": "esp32c3",
+      "address": "0x0",
+      "sha256": "982470a897c183108338f47ec2ca112128639cac62490b8731ee21cd6f7df014",
+      "size": 1328032
+    },
+    "s3-pico": {
+      "file": "blip-s3-pico-full.bin",
+      "chip": "esp32s3",
+      "address": "0x0",
+      "sha256": "e9c527dab36e385c4ed30d8e0e170532cde14a8e31b38ee8660d775d53bdaf49",
+      "size": 1199472
+    },
+    "c3-supermini-ld2450": {
+      "file": "blip-c3-supermini-ld2450-full.bin",
+      "chip": "esp32c3",
+      "address": "0x0",
+      "sha256": "04916a5e5f446a1ab2419600a704a11c81d6d4fc2334b40d30bbeb28201d2d22",
+      "size": 1328000
+    },
+    "s3-pico-ld2450": {
+      "file": "blip-s3-pico-ld2450-full.bin",
+      "chip": "esp32s3",
+      "address": "0x0",
+      "sha256": "fc146bab42309e831ecc79a4ab6859d230e2d028a93aac7c66403bfd5618d74d",
+      "size": 1199440
+    },
+    "c3-supermini-bench": {
+      "file": "blip-c3-supermini-bench-full.bin",
+      "chip": "esp32c3",
+      "address": "0x0",
+      "sha256": "33d0d67f5c065f7d7d106b92cf3e33ab8f7a329f5e37747906bb64987c7ed425",
+      "size": 1261728
+    },
+    "s3-pico-bench": {
+      "file": "blip-s3-pico-bench-full.bin",
+      "chip": "esp32s3",
+      "address": "0x0",
+      "sha256": "94f91821ecb23f53b240e2b4d140a5273459b8112bb47aab86832d6593c50096",
+      "size": 1120288
+    }
+  },
+  "note": "Whole-chip images: write at 0x0 (esptool --chip <chip> write_flash 0x0 <file>). Checked by the Flash tab before flashing. Regenerate with tools/make_prebuilt.py."
+}

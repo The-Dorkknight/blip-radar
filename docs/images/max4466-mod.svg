@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="700" viewBox="0 0 1040 700" font-family="DejaVu Sans, Arial, sans-serif">
+<rect width="1040" height="700" fill="#06120b"/>
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#39ff8a"/></marker></defs>
+<text x="20" y="34" fill="#ff8fd6" font-size="22" font-weight="bold">Stetho front end — CDM324 into a modded MAX4466 board</text>
+<text x="20" y="56" fill="#7fb597" font-size="13">No op-amp biasing to build: the MAX4466 board already has its mid-rail bias, gain pot and coupling caps. Not yet built and measured.</text>
+<rect x="20" y="80" width="175" height="140" rx="10" fill="#0b1d12" stroke="#ff8fd6" stroke-width="2"/>
+<text x="30" y="106" fill="#ff8fd6" font-size="15" font-weight="bold">CDM324 / HB100</text>
+<text x="30" y="130" fill="#d9f5e3" font-size="13">5 V, ~30–40 mA</text>
+<text x="30" y="150" fill="#d9f5e3" font-size="13">IF pin: µV–mV</text>
+<text x="30" y="170" fill="#d9f5e3" font-size="13">24 GHz: 160 Hz/(m/s)</text>
+<text x="30" y="190" fill="#d9f5e3" font-size="13">10.5 GHz: 70 Hz/(m/s)</text>
+<path d="M195,150 L220,150" stroke="#39ff8a" stroke-width="3" marker-end="url(#a)"/>
+<rect x="225" y="80" width="175" height="140" rx="10" fill="#0b1d12" stroke="#ff8fd6" stroke-width="2"/>
+<text x="235" y="106" fill="#ff8fd6" font-size="15" font-weight="bold">MAX4466 board</text>
+<text x="235" y="130" fill="#d9f5e3" font-size="13">mic capsule removed</text>
+<text x="235" y="150" fill="#d9f5e3" font-size="13">bias resistor removed</text>
+<text x="235" y="170" fill="#d9f5e3" font-size="13">gain pot ×25–×125</text>
+<text x="235" y="190" fill="#d9f5e3" font-size="13">3V3: OUT idles 1.65 V</text>
+<path d="M400,150 L425,150" stroke="#39ff8a" stroke-width="3" marker-end="url(#a)"/>
+<rect x="430" y="80" width="175" height="140" rx="10" fill="#0b1d12" stroke="#ff8fd6" stroke-width="2"/>
+<text x="440" y="106" fill="#ff8fd6" font-size="15" font-weight="bold">ESP32 ADC (DMA)</text>
+<text x="440" y="130" fill="#d9f5e3" font-size="13">8 kHz, 12-bit</text>
+<text x="440" y="150" fill="#d9f5e3" font-size="13">DC tracker removes</text>
+<text x="440" y="170" fill="#d9f5e3" font-size="13">the 1.65 V idle level</text>
+<text x="440" y="190" fill="#d9f5e3" font-size="13">rail = shock flag</text>
+<path d="M605,150 L630,150" stroke="#39ff8a" stroke-width="3" marker-end="url(#a)"/>
+<rect x="635" y="80" width="175" height="140" rx="10" fill="#0b1d12" stroke="#ff8fd6" stroke-width="2"/>
+<text x="645" y="106" fill="#ff8fd6" font-size="15" font-weight="bold">DSP on the ESP32</text>
+<text x="645" y="130" fill="#d9f5e3" font-size="13">bump gate</text>
+<text x="645" y="150" fill="#d9f5e3" font-size="13">EQ: heart/lungs/voice</text>
+<text x="645" y="170" fill="#d9f5e3" font-size="13">4-band noise cut</text>
+<text x="645" y="190" fill="#d9f5e3" font-size="13">AGC + limiter</text>
+<path d="M810,150 L835,150" stroke="#39ff8a" stroke-width="3" marker-end="url(#a)"/>
+<rect x="840" y="80" width="185" height="44" rx="8" fill="#0b1d12" stroke="#c9a0ff" stroke-width="2"/>
+<text x="850" y="99" fill="#c9a0ff" font-size="12" font-weight="bold">Phone (WebSocket)</text>
+<text x="850" y="116" fill="#7fb597" font-size="10">16 ms packets, ~40 ms buffer</text>
+<rect x="840" y="130" width="185" height="44" rx="8" fill="#0b1d12" stroke="#c9a0ff" stroke-width="2"/>
+<text x="850" y="149" fill="#c9a0ff" font-size="12" font-weight="bold">3.5 mm earphones</text>
+<text x="850" y="166" fill="#7fb597" font-size="10">delta-sigma (I2S PDM) + RC</text>
+<rect x="840" y="180" width="185" height="44" rx="8" fill="#0b1d12" stroke="#c9a0ff" stroke-width="2"/>
+<text x="850" y="199" fill="#c9a0ff" font-size="12" font-weight="bold">I2S amp + speaker</text>
+<text x="850" y="216" fill="#7fb597" font-size="10">MAX98357A board</text>
+<rect x="20" y="250" width="1000" height="150" rx="10" fill="#2a0b0b" stroke="#ff5c5c" stroke-width="2"/>
+<text x="36" y="278" fill="#ff5c5c" font-size="17" font-weight="bold">⚠  DC on the old mic pads — read before you solder</text>
+<text x="36" y="304" fill="#d9f5e3" font-size="12.5">The pad the mic's + leg used is pulled up to VCC through the mic bias resistor (~2 kΩ). Wire the radar's IF pin straight onto it and</text>
+<text x="36" y="323" fill="#d9f5e3" font-size="12.5">that DC (~1.5 mA) is pushed into the CDM324's mixer diode: best case a shifted, noisy IF, worst case a damaged module.</text>
+<text x="36" y="342" fill="#d9f5e3" font-size="12.5">Fix it one of two ways:  (1) remove (or cut the track to) the bias resistor, and keep the board's own coupling cap — it does the DC blocking;</text>
+<text x="36" y="361" fill="#d9f5e3" font-size="12.5">or  (2) leave the board alone and put a DC-blocking cap in series with the IF lead (10–47 µF, + towards the MAX4466 pad).</text>
+<text x="36" y="380" fill="#d9f5e3" font-size="12.5">Never connect the IF pin to MAX4466 OUT or VCC. Power the MAX4466 from 3V3 so its output stays inside the ESP32 ADC range.</text>
+<text x="20" y="450" fill="#c9a0ff" font-size="17" font-weight="bold">Earphone output (delta-sigma) — one pin, three parts</text>
+<text x="40" y="505" fill="#d9f5e3" font-size="14">GPIO (PDM)</text>
+<path d="M130,500 L200,500" stroke="#c9a0ff" stroke-width="2"/>
+<rect x="200" y="490" width="70" height="20" fill="none" stroke="#c9a0ff" stroke-width="2"/><text x="235" y="484" fill="#d9f5e3" font-size="12" text-anchor="middle">470 Ω</text>
+<path d="M270,500 L420,500" stroke="#c9a0ff" stroke-width="2"/><circle cx="330" cy="500" r="4" fill="#c9a0ff"/>
+<path d="M330,500 L330,540 M315,540 L345,540 M315,548 L345,548 M330,548 L330,580 M318,580 L342,580 M323,586 L337,586" stroke="#c9a0ff" stroke-width="2" fill="none"/>
+<text x="352" y="550" fill="#d9f5e3" font-size="12">100 nF (≈3.4 kHz low-pass)</text>
+<path d="M420,486 L420,514 M432,486 L432,514" stroke="#c9a0ff" stroke-width="3"/><text x="410" y="480" fill="#d9f5e3" font-size="12">+</text>
+<text x="426" y="532" fill="#d9f5e3" font-size="12" text-anchor="middle">220 µF</text>
+<path d="M432,500 L560,500" stroke="#c9a0ff" stroke-width="2"/>
+<text x="570" y="505" fill="#d9f5e3" font-size="14">3.5 mm tip + ring (both ears, mono) · sleeve → GND</text>
+<text x="20" y="630" fill="#7fb597" font-size="12">The ESP32's I2S peripheral in PDM mode outputs a 1-bit delta-sigma stream (~2 MHz). The RC smooths it into audio; the 220 µF blocks the 1.65 V average</text>
+<text x="20" y="650" fill="#7fb597" font-size="12">and, with a 32 Ω earphone, keeps the bass down to ~20 Hz (heart sounds live at 20–150 Hz). Start with Node volume low. One output at a time:</text>
+<text x="20" y="670" fill="#7fb597" font-size="12">earphones OR the I2S amp. The amp board (MAX98357A): VIN 5 V, GND, BCLK, LRC → WS, DIN; GAIN and SD left open; 4–8 Ω speaker on its terminals.</text>
+</svg>

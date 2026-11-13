@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  Blip — the flasher's home page (what the Blip-* launchers open). NOT part of the firmware: only the PC
+  tool tools/sim_radar.py serves it, at "/", for this computer only. The flasher itself (web/flasher.html)
+  is inlined at __FLASHER__ by tools/flasher.py. The radar simulator lives at /sim.
+  Required Notice: Copyright Matthew Armstrong (https://github.com/The-Dorkknight)
+  Licensed under the PolyForm Noncommercial License 1.0.0. No warranty.
+-->
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blip Flasher</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23170709'/%3E%3Cpath d='M18 3 7 18h8l-2 11 12-16h-8z' fill='%23ff5468'/%3E%3C/svg%3E">
+<style>
+/* maroon radar: same phosphor look as the node's page, in red */
+:root{--bg:#0e0506;--panel:#1a0a0d;--line:#3d1820;--ph:#ff5468;--ph2:#a3243a;--dim:#c69aa2;--txt:#f8e6e9;--warn:#ffc46b;--bad:#ffab3d;--t2:#ff9fb0;
+  --fl-sel:#3a0f19;--fl-well:#140608;--fl-ink:#2a060c;--fl-glow:255,84,104;--fl-ok:#5dff9a;--fl-badbg:#2e1a05;--fl-log:#0a0304;--fl-dimlog:#9a6c74}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%;color:var(--txt);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+body{background:
+  radial-gradient(circle at 50% -10%,rgba(255,84,104,.13) 0,transparent 46%),
+  repeating-radial-gradient(circle at 50% -10%,transparent 0 63px,rgba(255,84,104,.045) 63px 64px),
+  var(--bg);background-attachment:fixed}
+a{color:var(--ph)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.muted{color:var(--dim)}
+button.b{background:var(--panel);border:1px solid var(--ph2);color:var(--txt);padding:9px 14px;border-radius:8px;font-size:14px;min-height:40px;cursor:pointer}
+button.b:hover{border-color:var(--ph)}
+button.b:disabled{opacity:.45;cursor:default}
+button.b.danger{border-color:var(--bad);color:var(--bad)}
+.top{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(26,10,13,.86);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;backdrop-filter:blur(6px)}
+.scope{flex:none;width:38px;height:38px;border-radius:50%;border:1.5px solid var(--ph2);position:relative;overflow:hidden;
+  background:repeating-radial-gradient(circle,transparent 0 6px,rgba(255,84,104,.25) 6px 7px),#12050a;box-shadow:0 0 14px rgba(255,84,104,.25)}
+.scope::before{content:"";position:absolute;inset:0;background:conic-gradient(from 0deg,rgba(255,84,104,.75),rgba(255,84,104,0) 70deg);animation:sweep 3s linear infinite}
+.scope::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--ph);left:24px;top:9px;box-shadow:0 0 6px var(--ph);animation:blip 3s linear infinite}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@keyframes blip{0%,30%{opacity:0}33%{opacity:1}80%,100%{opacity:0}}
+.brand h1{margin:0;font-size:18px;letter-spacing:.14em;color:var(--ph);text-shadow:0 0 12px rgba(255,84,104,.45)}
+.brand h1 span{color:var(--txt);font-weight:500;letter-spacing:.1em}
+.brand p{margin:1px 0 0;font-size:12px;color:var(--dim)}
+.simbtn{margin-left:auto;flex:none;text-decoration:none;font-size:12px;letter-spacing:.05em;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.simbtn:hover{color:var(--txt);border-color:var(--ph2)}
+main{padding:14px 16px 40px;max-width:760px;margin:0 auto}
+.wip{background:#2e1a05;color:#ffd08a;border:1px solid #7a4a10;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:12px}
+footer{max-width:760px;margin:0 auto;padding:0 16px 30px;font-size:12px;color:var(--dim)}
+#flash .fl-hero{background:linear-gradient(135deg,#3a0f19 0%,var(--panel) 62%)!important}
+@media(prefers-reduced-motion:reduce){.scope::before,.scope::after{animation:none}}
+@media(max-width:420px){.brand p{display:none}.simbtn{padding:5px 10px}}
+</style>
+</head><body>
+<header class="top">
+  <div class="scope" aria-hidden="true"></div>
+  <div class="brand"><h1>BLIP <span>FLASHER</span></h1><p>Put Blip onto an ESP32 board · __VERSION__</p></div>
+  <a class="simbtn" href="/sim" title="Try the Blip page with a simulated radar, no hardware needed">Radar simulator ›</a>
+</header>
+<main>
+  <div class="wip">WORK IN PROGRESS: many features may be broken. Not yet tested on every board.</div>
+__FLASHER__
+</main>
+<footer>This page only works on this computer. Once flashed, the board runs its own Wi-Fi hotspot and page: join the hotspot on your phone and open the address the board shows. Want to look around first? <a href="/sim">Open the radar simulator</a>.</footer>
+</body></html>

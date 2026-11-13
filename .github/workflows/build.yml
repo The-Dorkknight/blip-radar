@@ -1,0 +1,46 @@
+name: build
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native parser test
+        run: g++ -std=c++11 -Wall -Wextra -I firmware/include tests/test_parser.cpp -o test_parser && ./test_parser
+      - name: Native audio DSP test
+        run: g++ -std=c++17 -O2 -Wall -Wextra -I firmware/include tests/test_audio_dsp.cpp -o test_dsp && ./test_dsp
+      - name: Stetho DSP stability (sanitizers)
+        run: g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined -Wall -Wextra -I firmware/include tests/test_dsp_stability.cpp -o test_dsp_stab && ./test_dsp_stab
+      - name: Stetho DSP dynamics - knocks, movement, burst blanker (sanitizers)
+        run: g++ -std=c++20 -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined -Wall -Wextra -I firmware/include tests/test_dsp_dynamics.cpp -o test_dsp_dyn && ./test_dsp_dyn
+      - name: Heart / breath pattern recognition (page code, Node)
+        run: node tests/test_vitals_pr.js
+      - name: Native tracker + OLED render tests
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -I firmware/include tests/test_tracker.cpp -o test_tracker && ./test_tracker
+          g++ -std=c++17 -Wall -Wextra -I firmware/include tests/oled_render.cpp -o oled_render && ./oled_render .
+      - name: Python tests
+        run: |
+          pip install pyserial
+          python3 tests/test_parser_py.py && python3 tests/test_tracker_py.py && python3 tests/test_launchers.py
+          python3 tests/test_flasher.py
+          python3 tests/test_soak.py
+          python3 tests/test_analyze_wav.py
+      - name: Embedded UI regenerates
+        run: python3 tools/embed_web.py
+  firmware:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [c3-supermini, s3-pico, c3-supermini-ld2450, s3-pico-ld2450, c3-supermini-bench, s3-pico-bench]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install platformio
+      - run: pio run -d firmware -e ${{ matrix.env }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.env }}
+          path: firmware/.pio/build/${{ matrix.env }}/firmware.bin

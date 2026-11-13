@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+firmware/.pio/
+firmware/.vscode/
+build/
+logs/
+*.log
+*.jks
+*.keystore
+.DS_Store
+Thumbs.db

@@ -1,0 +1,48 @@
+name: release
+# Builds every firmware variant and the PDF manual, then creates the GitHub pre-release with all of them attached.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Tools
+        run: |
+          pip install platformio markdown pillow playwright
+          python -m playwright install --with-deps chromium
+      - name: Build all six firmware images (4 Blip variants + 2 bench tests)
+        run: |
+          python3 tools/embed_web.py
+          for e in c3-supermini s3-pico c3-supermini-ld2450 s3-pico-ld2450 c3-supermini-bench s3-pico-bench; do pio run -d firmware -e "$e"; done
+      - name: Version
+        id: v
+        run: echo "version=$(grep -oP 'BLIP_VERSION="\K[^"]+' firmware/platformio.ini)" >> "$GITHUB_OUTPUT"
+      - name: PDF manual
+        run: python3 tools/make_pdf.py --out "out-pdf.pdf"
+      - name: Collect release files
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          mkdir out
+          for e in c3-supermini s3-pico c3-supermini-ld2450 s3-pico-ld2450 c3-supermini-bench s3-pico-bench; do
+            # whole-chip image (bootloader + partitions + app): flash at 0x0 with the Flash tab, esptool or any web flasher
+            cp "firmware/.pio/build/$e/firmware.factory.bin" "out/blip-$e-full.bin"
+            # app only, for flashing over an existing Blip at 0x10000
+            cp "firmware/.pio/build/$e/firmware.bin" "out/blip-$e-app.bin"
+          done
+          cp out-pdf.pdf "out/blip-radar-v$V-manual.pdf"
+          (cd out && sha256sum * > SHA256SUMS.txt)
+          ls -la out
+      - name: Create pre-release
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          TAG="${GITHUB_REF_NAME}"; [ "${GITHUB_REF_TYPE}" = "tag" ] || TAG="v${{ steps.v.outputs.version }}"
+          NOTES="Work in progress: many features may be broken. Not yet tested on real hardware.
+          The PDF is the manual and research notes for this version. The -full.bin files are whole-chip images (write at 0x0); the Flash tab in the simulator page writes them for you. See CHANGELOG.md."
+          gh release create "$TAG" out/* --prerelease --title "Blip $TAG" --notes "$NOTES" || gh release upload "$TAG" out/* --clobber

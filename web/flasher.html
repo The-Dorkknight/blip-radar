@@ -1,0 +1,387 @@
+<!doctype html>
+<!--
+  Blip — the "Flash" tab. NOT part of the firmware: only the PC simulator (tools/sim_radar.py) serves this
+  file, and web/index.html loads it into itself when the status says "flash": true. The ESP32 never has it.
+  Required Notice: Copyright Matthew Armstrong (https://github.com/The-Dorkknight)
+  Licensed under the PolyForm Noncommercial License 1.0.0. No warranty.
+-->
+<html><head><meta charset="utf-8"><title>Blip flasher</title>
+<style>
+#flash .fl-hero{border:1px solid var(--ph2);border-radius:12px;padding:14px 16px;margin-bottom:6px;background:linear-gradient(135deg,var(--fl-sel,#0f3a22) 0%,var(--panel) 62%);box-shadow:0 0 24px rgba(var(--fl-glow,57,255,138),.07) inset;display:flex;gap:14px;align-items:center}
+#flash .fl-hero svg{flex:none;width:44px;height:44px;color:var(--ph);filter:drop-shadow(0 0 6px rgba(var(--fl-glow,57,255,138),.55))}
+#flash .fl-hero h2{margin:0 0 2px;font-size:18px;color:var(--ph);letter-spacing:.04em}
+#flash .fl-hero p{margin:0}
+#flash .fl-tabs{display:flex;gap:6px;margin:0 0 12px;border-bottom:1px solid var(--line)}
+#flash .fl-tab{all:unset;box-sizing:border-box;cursor:pointer;padding:9px 16px;font-size:14px;font-weight:600;color:var(--dim);border:1px solid transparent;border-bottom:0;border-radius:9px 9px 0 0;margin-bottom:-1px}
+#flash .fl-tab:hover{color:var(--text,#eee)}
+#flash .fl-tab[aria-selected=true]{color:var(--ph);background:var(--panel);border-color:var(--line)}
+#flash .fl-tab:focus-visible{outline:2px solid var(--ph);outline-offset:2px}
+#flash .fl-diag{margin:0 0 4px}
+#flash .fl-h{display:flex;align-items:center;gap:9px;margin:18px 0 8px;font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);font-weight:600}
+#flash .fl-n{width:22px;height:22px;border-radius:50%;border:1px solid var(--ph2);color:var(--ph);display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+#flash .fl-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#flash .fl-card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:3px;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--txt);transition:border-color .15s,background .15s,box-shadow .15s}
+#flash .fl-card:hover{border-color:var(--ph2)}
+#flash .fl-card:focus-visible{outline:2px solid var(--ph);outline-offset:2px}
+#flash .fl-card svg{width:100%;height:62px;color:var(--dim);margin-bottom:4px}
+#flash .fl-card b{font-size:15px}
+#flash .fl-card small{color:var(--dim);font-size:12px;line-height:1.3}
+#flash .fl-card[aria-pressed=true]{border-color:var(--ph);background:var(--fl-sel,#0f3a22);box-shadow:0 0 0 1px var(--ph),0 0 18px rgba(var(--fl-glow,57,255,138),.18)}
+#flash .fl-card[aria-pressed=true] svg{color:var(--ph)}
+#flash.fl-busy .fl-card{opacity:.55;cursor:default}
+#flash .fl-port{display:flex;gap:8px;align-items:center}
+#flash .fl-port select{flex:1;min-width:0;background:var(--fl-well,#071a0f);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;min-height:40px}
+#flash .fl-led{flex:none;width:11px;height:11px;border-radius:50%;background:var(--warn);box-shadow:0 0 6px var(--warn)}
+#flash .fl-led.on{background:var(--ph);box-shadow:0 0 9px var(--ph)}
+#flash .fl-chk{display:flex;gap:8px;align-items:center;margin:8px 0 0;font-size:14px}
+#flash .fl-usblog{font-size:13px;min-height:36px;padding:6px 12px}
+#flash .fl-go{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 4px}
+#flash .fl-flash{font-size:16px;padding:12px 22px;min-height:46px;border-color:var(--ph);color:var(--ph);background:var(--fl-sel,#0f3a22);font-weight:600;letter-spacing:.03em;box-shadow:0 0 16px rgba(var(--fl-glow,57,255,138),.15)}
+#flash .fl-flash:disabled{opacity:.5;box-shadow:none}
+#flash .fl-steps{list-style:none;margin:16px 0 10px;padding:0;display:flex}
+#flash .fl-steps li{flex:1;position:relative;text-align:center;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--dim)}
+#flash .fl-steps li::before{content:"";position:absolute;top:13px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}
+#flash .fl-steps li:first-child::before{display:none}
+#flash .fl-steps li i{position:relative;z-index:1;display:flex;margin:0 auto 5px;width:28px;height:28px;border-radius:50%;background:var(--bg);border:2px solid var(--line);align-items:center;justify-content:center;font-style:normal;font-size:13px;color:var(--dim)}
+#flash .fl-steps li.done::before,#flash .fl-steps li.active::before{background:var(--ph2)}
+#flash .fl-steps li.done i{background:var(--fl-ok,var(--ph));border-color:var(--fl-ok,var(--ph));color:var(--fl-ink,#04210f);font-weight:700}
+#flash .fl-steps li.done,#flash .fl-steps li.active{color:var(--txt)}
+#flash .fl-steps li.active i{border-color:var(--ph);color:var(--ph);animation:flpulse 1.2s ease-in-out infinite}
+#flash .fl-steps li.error i{background:var(--bad);border-color:var(--bad);color:#2a0606;font-weight:700}
+#flash .fl-steps li.error{color:var(--bad)}
+@keyframes flpulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--fl-glow,57,255,138),.55)}50%{box-shadow:0 0 0 7px rgba(var(--fl-glow,57,255,138),0)}}
+#flash .fl-bar{height:9px;background:var(--fl-well,#071a0f);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+#flash .fl-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ph2),var(--ph));transition:width .25s}
+#flash .fl-bar.ind i{width:35%;animation:flslide 1.2s ease-in-out infinite alternate;transition:none}
+#flash .fl-bar.bad i{background:var(--bad)}
+@keyframes flslide{from{margin-left:0}to{margin-left:65%}}
+#flash .fl-act{display:flex;justify-content:space-between;gap:10px;margin-top:6px;font-size:12px;color:var(--dim);min-height:18px}
+#flash .fl-act span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#flash .fl-act span:last-child{flex:none;font-variant-numeric:tabular-nums}
+#flash .fl-banner{border-radius:10px;padding:11px 14px;margin:12px 0;font-size:14px;border:1px solid}
+#flash .fl-banner b{display:block;font-size:15px;margin-bottom:2px}
+#flash .fl-banner.ok{border-color:var(--fl-ok,var(--ph));background:var(--fl-sel,#0f3a22);color:var(--txt)}
+#flash .fl-banner.ok b{color:var(--fl-ok,var(--ph))}
+#flash .fl-banner.bad{border-color:var(--bad);background:var(--fl-badbg,#2a0f0f)}
+#flash .fl-banner.bad b{color:var(--bad)}
+#flash .fl-banner.tip{border-color:#7a5a00;background:#2b2200}
+#flash .fl-banner.tip b{color:var(--warn)}
+#flash .fl-banner p{margin:2px 0 0}
+#flash .fl-banner code{background:#00000055;padding:1px 5px;border-radius:4px;font-size:12px;user-select:all}
+#flash .fl-logh{display:flex;justify-content:space-between;align-items:center;margin:14px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+#flash .fl-mini{all:unset;cursor:pointer;margin-left:8px;padding:3px 9px;border:1px solid var(--line);border-radius:6px;font-size:11px;color:var(--dim);letter-spacing:.04em}
+#flash .fl-mini:hover{border-color:var(--ph2);color:var(--txt)}
+#flash .fl-log{margin:0;height:260px;overflow:auto;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;background:var(--fl-log,#04100a)}
+#flash .fl-log div{padding:0 2px}
+#flash .fl-log .fl-note{color:var(--ph);font-weight:600}
+#flash .fl-log .fl-cmd{color:var(--t2)}
+#flash .fl-log .fl-err{color:var(--bad)}
+#flash .fl-log .fl-ok{color:var(--fl-ok,var(--ph))}
+#flash .fl-log .fl-dim{color:var(--fl-dimlog,#5d8a72)}
+#flash .fl-fw{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--fl-well,#071a0f);font-size:13px}
+#flash .fl-fw dl{display:grid;grid-template-columns:max-content 1fr;gap:3px 12px;margin:0}
+#flash .fl-fw dt{color:var(--dim)}
+#flash .fl-fw dd{margin:0;min-width:0;overflow-wrap:anywhere}
+#flash .fl-fw .fl-hash{font:11.5px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;user-select:all}
+#flash .fl-fw .fl-ok{color:var(--fl-ok,var(--ph))}
+#flash .fl-fw .fl-warn{color:var(--warn)}
+#flash .fl-fw p{margin:8px 0 0;color:var(--dim)}
+#flash details{margin-top:14px}
+#flash details summary{cursor:pointer;color:var(--dim);font-size:13px}
+#flash details ul{margin:6px 0 0;padding-left:20px;font-size:13px;color:var(--dim)}
+#flash details li{margin:4px 0}
+#flash details code{background:var(--fl-well,#071a0f);padding:1px 5px;border-radius:4px;color:var(--txt)}
+@media(max-width:480px){#flash .fl-pick{grid-template-columns:1fr}#flash .fl-steps li{font-size:10px}}
+@media(prefers-reduced-motion:reduce){#flash *{animation:none!important}}
+</style></head>
+<body>
+<section id="flash">
+  <div class="fl-tabs" role="tablist" aria-label="Flasher">
+    <button class="fl-tab" id="flTabFlash" role="tab" type="button">⚡ Flash Blip</button>
+    <button class="fl-tab" id="flTabDiag" role="tab" type="button">🩺 Diagnostics</button>
+  </div>
+  <div class="fl-hero">
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M27 4 10 27h12l-3 17 19-25H26z"/></svg>
+    <div><h2 id="flHeroT">Flash a real Blip node</h2>
+    <p class="muted" id="flHeroP">Plug the board into this computer with a USB <b>data</b> cable, pick what you have, press Flash. It writes the firmware bundled with this release (after checking its checksum), or builds your own. Then join the board's Wi-Fi hotspot to use it.</p></div>
+  </div>
+
+  <div class="fl-h"><span class="fl-n">1</span> Board</div>
+  <div class="fl-pick" id="flBoards"></div>
+  <div class="fl-h"><span class="fl-n">2</span> <span id="flFwH">Firmware</span></div>
+  <div class="fl-pick" id="flRadars"></div>
+  <div class="fl-h"><span class="fl-n">3</span> How</div>
+  <div class="fl-pick" id="flModes"></div>
+  <div class="fl-fw" id="flFw" aria-live="polite"></div>
+  <div class="fl-h"><span class="fl-n">4</span> USB port</div>
+  <div class="fl-port"><span class="fl-led" id="flLed"></span><select id="flPort" aria-label="Serial port"></select><button class="b" id="flRefresh" type="button" title="Look again" aria-label="Refresh ports">↻</button></div>
+  <p class="muted" id="flPortMsg" style="margin:6px 0 0"></p>
+  <label class="fl-chk"><input type="checkbox" id="flMon" checked> Show the board's serial output when it is done</label>
+
+  <div class="fl-go">
+    <button class="b fl-flash" id="flGo" type="button">⚡ Flash firmware</button>
+    <button class="b fl-usblog" id="flUsbLog" type="button" title="Show what the board prints over USB (start-up, health lines every 10 s), without flashing">🔌 USB log</button>
+    <button class="b danger" id="flStop" type="button" hidden>Cancel</button>
+    <span class="muted" id="flPio"></span>
+  </div>
+
+  <ol class="fl-steps" id="flSteps" aria-label="Progress"></ol>
+  <div class="fl-bar" id="flBar"><i></i></div>
+  <div class="fl-act" aria-live="polite"><span id="flAct">Ready.</span><span id="flTime"></span></div>
+
+  <div id="flBanner"></div>
+  <div id="flHints"></div>
+
+  <div class="fl-logh"><span>Log</span><span><button class="fl-mini" id="flCopy" type="button">Copy</button><button class="fl-mini" id="flClear" type="button">Clear</button></span></div>
+  <pre class="fl-log" id="flLog" aria-label="Flash log"></pre>
+
+  <details>
+    <summary>It won't connect — what now?</summary>
+    <ul>
+      <li>Use a <b>data</b> USB cable. Charge-only cables show no port.</li>
+      <li><b>C3 Super Mini:</b> hold <b>BOOT</b>, tap <b>RESET</b>, release BOOT, then press Flash. After a flash it comes back on a slightly different port; that is normal.</li>
+      <li><b>S3-Pico:</b> hold <b>BOOT</b> while plugging it in. On Windows and older macOS it needs the CH343 driver (Waveshare wiki).</li>
+      <li data-os="linux">Linux: <code>sudo usermod -aG dialout $USER</code>, then log out and in (Arch: <code>uucp</code>). Without it the port exists but Blip may not open it.</li>
+      <li data-os="mac">macOS: the first run may ask to install the command-line tools (Git). Say yes.</li>
+      <li data-os="win">Windows: close the Arduino IDE or any serial monitor, only one program can hold the port.</li>
+      <li><b>Quick flash</b> downloads only esptool (about 40 MB) the first time. <b>Build from source</b> downloads PlatformIO and the ESP32 toolchain (a few GB) and needs <b>Git</b>; later builds are quick.</li>
+      <li>Want to flash without Blip? Quick flash shows the exact command; any ESP32 web flasher can also write the <code>-full.bin</code> at address 0x0.</li>
+      <li>Still stuck? <b>Copy</b> the log above and put it in a GitHub issue.</li>
+    </ul>
+  </details>
+</section>
+
+<script>
+(function(){
+'use strict';
+const TOKEN="__BLIP_TOKEN__";
+const root=document.getElementById('flash');
+const $=s=>root.querySelector(s);
+const MODES={quick:['Firmware','Flash tool','Upload','Boot'],source:['Prepare','PlatformIO','Build','Upload','Boot'],log:['Serial tool','USB log']};
+const MODE_CARDS=[
+ {id:'quick',name:'Quick flash (recommended)',blurb:'Writes the firmware bundled with this release, after checking its checksum. Needs only esptool (about 40 MB, once). No Git, no compiler.'},
+ {id:'source',name:'Build from source',blurb:'Compiles this folder with PlatformIO, so your own changes go in. Needs Git and a few GB of tools the first time.'}];
+const sel={board:'c3',radar:'rd03d',port:'auto',monitor:true,mode:'quick',tab:'flash'};
+try{Object.assign(sel,JSON.parse(localStorage.getItem('blip.flash')||'{}'));}catch(e){}
+if(!MODES[sel.mode]||sel.mode==='log')sel.mode='quick';
+if(sel.radar==='bench')sel.radar='rd03d';
+if(sel.tab!=='diag')sel.tab='flash';
+const diag=()=>sel.tab==='diag';
+const radarId=()=>diag()?'bench':sel.radar;
+const save=()=>{try{localStorage.setItem('blip.flash',JSON.stringify(sel));}catch(e){}};
+let info=null,snap=null,cursor=0,lastPorts='',allLines=[],hintKey='';
+const running=()=>!!snap&&(snap.state==='running'||snap.state==='monitoring');
+const active=()=>root.classList.contains('on');
+
+// ---- little board / radar pictures (stroke = currentColor, so selection recolours them)
+const PIN=(x,y)=>'<circle cx="'+x+'" cy="'+y+'" r="1.1" fill="currentColor" stroke="none"/>';
+const col=(x,n,y0,dy)=>Array.from({length:n},(_,i)=>PIN(x,y0+i*dy)).join('');
+const SV=(b)=>'<svg viewBox="0 0 64 42" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">'+b+'</svg>';
+const ICONS={
+ c3:SV('<rect x="18" y="5" width="28" height="32" rx="3"/><rect x="27" y="1.5" width="10" height="6" rx="2"/><rect x="25" y="16" width="14" height="12" rx="1.5"/><text x="32" y="25" font-size="7" text-anchor="middle" fill="currentColor" stroke="none" font-family="system-ui">C3</text>'+col(21,7,10,4)+col(43,7,10,4)),
+ s3:SV('<rect x="19" y="2" width="26" height="38" rx="3"/><rect x="27" y="0.5" width="10" height="5" rx="2"/><rect x="25" y="13" width="14" height="13" rx="1.5"/><text x="32" y="22" font-size="7" text-anchor="middle" fill="currentColor" stroke="none" font-family="system-ui">S3</text>'+col(22,9,9,3.6)+col(42,9,9,3.6)),
+ rd03d:SV('<rect x="12" y="4" width="40" height="30" rx="2.5"/><g fill="currentColor" stroke="none" opacity=".75"><rect x="16" y="8" width="3" height="10"/><rect x="20.5" y="8" width="3" height="10"/><rect x="25" y="8" width="3" height="10"/><rect x="36" y="8" width="3" height="10"/><rect x="40.5" y="8" width="3" height="10"/><rect x="45" y="8" width="3" height="10"/></g><path d="M28 24h8" /><rect x="25" y="34" width="14" height="5" rx="1"/>'+[27.5,30.5,33.5,36.5].map(x=>'<path d="M'+x+' 36v3" stroke-width="1"/>').join('')),
+ quick:SV('<rect x="20" y="9" width="24" height="24" rx="3"/><path d="M34 12l-7 10h6l-2 8 8-11h-6z" fill="currentColor" stroke="none"/>'+[13,19,25].map(y=>'<path d="M14 '+y+'h6M44 '+y+'h6"/>').join('')),
+ source:SV('<path d="M22 11l-10 10 10 10M42 11l10 10-10 10M35 7l-6 28"/>'),
+ bench:SV('<rect x="14" y="8" width="36" height="26" rx="3"/><path d="M21 21l5 5 9-11" stroke-width="2.4"/><path d="M40 17h5M40 22h5M40 27h5"/>'),
+ ld2450:SV('<rect x="8" y="4" width="48" height="31" rx="2.5"/><g fill="currentColor" stroke="none" opacity=".75"><rect x="12" y="8" width="3" height="12"/><rect x="16.5" y="8" width="3" height="12"/><rect x="21" y="8" width="3" height="12"/><rect x="25.5" y="8" width="3" height="12"/><rect x="35.5" y="8" width="3" height="12"/><rect x="40" y="8" width="3" height="12"/><rect x="44.5" y="8" width="3" height="12"/></g><rect x="21.5" y="35.5" width="21" height="5" rx="1"/>'+[25,29,33,37].map(x=>PIN(x,38)).join(''))
+};
+
+// ---- network
+function api(path,opt){return fetch(path,opt).then(async r=>{let j={};try{j=await r.json();}catch(e){}if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;});}
+const post=(p,b)=>api(p,{method:'POST',headers:{'X-Blip-Token':TOKEN,'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+
+// ---- pickers
+function pick(el,items,key){
+  el.textContent='';
+  items.forEach(it=>{
+    const b=document.createElement('button');b.type='button';b.className='fl-card';b.dataset.id=it.id;b.setAttribute('aria-pressed',String(sel[key]===it.id));
+    b.insertAdjacentHTML('beforeend',ICONS[it.id]||'');
+    const t=document.createElement('b');t.textContent=it.name;const s=document.createElement('small');s.textContent=it.blurb;b.append(t,s);
+    b.onclick=()=>{if(running())return;sel[key]=it.id;save();pick(el,items,key);onPick();};
+    el.appendChild(b);
+  });
+}
+function pickRadars(){
+  const el=$('#flRadars');
+  if(diag()){
+    pick(el,info.radars.filter(r=>r.id==='bench'),'tab');   // one card, always the chosen one
+    el.firstChild.setAttribute('aria-pressed','true');
+    el.firstChild.onclick=null;
+  }else pick(el,info.radars.filter(r=>r.id!=='bench'),'radar');
+}
+function setTab(t){
+  if(running())return;
+  sel.tab=t;save();renderTab();
+  if(info){pickRadars();renderFw();}
+}
+function renderTab(){
+  const d=diag();
+  $('#flTabFlash').setAttribute('aria-selected',String(!d));$('#flTabDiag').setAttribute('aria-selected',String(d));
+  $('#flHeroT').textContent=d?'Test a board before you trust it':'Flash a real Blip node';
+  $('#flHeroP').textContent=d?'Flashes a separate pass/fail test, not Blip: chip, RAM, PSRAM, flash (including a fake-capacity check), Wi-Fi radio and pins, then 2 minutes of Stetho + Wi-Fi under load. The results print in the log below. Flash Blip again from the other tab afterwards.'
+    :'Plug the board into this computer with a USB data cable, pick what you have, press Flash. It writes the firmware bundled with this release (after checking its checksum), or builds your own. Then join the board\'s Wi-Fi hotspot to use it.';
+  $('#flFwH').textContent=d?'Test':'Firmware';
+  $('#flGo').textContent=d?'🩺 Flash the bench test':'⚡ Flash firmware';
+  $('#flMon').closest('label').hidden=d;
+}
+$('#flTabFlash').onclick=()=>setTab('flash');$('#flTabDiag').onclick=()=>setTab('diag');
+function renderPorts(ports){
+  const key=JSON.stringify(ports);if(key===lastPorts)return;lastPorts=key;
+  const s=$('#flPort');s.textContent='';s.add(new Option('Auto-detect (the one USB board plugged in)','auto'));
+  ports.forEach(p=>s.add(new Option(p.port+(p.desc?'  —  '+p.desc:''),p.port)));
+  if(!Array.from(s.options).some(o=>o.value===sel.port))sel.port='auto';
+  s.value=sel.port;
+  $('#flLed').className='fl-led'+(ports.length?' on':'');
+  $('#flPortMsg').textContent=ports.length===0?'No board detected yet. Plug it in with a data cable; if nothing appears, hold BOOT while plugging it in.'
+    :ports.length===1?'Found one serial port — that is probably your board.':'Found '+ports.length+' serial ports. Pick the board\'s own if Auto-detect guesses wrong.';
+}
+$('#flPort').onchange=e=>{sel.port=e.target.value;save();renderFw();};
+$('#flMon').onchange=e=>{sel.monitor=e.target.checked;save();};
+$('#flRefresh').onclick=()=>refreshInfo().catch(()=>{});
+
+function envName(){if(!info)return'';const b=info.boards.find(x=>x.id===sel.board),r=info.radars.find(x=>x.id===radarId());return b&&r?b.env+r.suffix:'';}
+const kb=n=>(n/1024).toFixed(0)+' KB';
+function renderFw(){
+  const box=$('#flFw');box.textContent='';if(!info)return;
+  const tools=$('#flPio');
+  if(sel.mode==='source'){
+    tools.textContent=info.pio.state==='ready'?'PlatformIO is ready.':'First build: Blip installs PlatformIO and the ESP32 toolchain (a few GB; needs the internet and Git; 5–15 minutes).';
+    const p=document.createElement('p');p.style.margin='0';
+    p.textContent='Builds env '+envName()+' from firmware/ in this folder (web page re-embedded first), then uploads with PlatformIO. Your own changes go in.';
+    box.appendChild(p);return;
+  }
+  tools.textContent=info.esptool.state==='ready'?'esptool is ready.':'First flash: Blip installs esptool into .venv (about 40 MB, needs the internet once).';
+  const pb=info.prebuilt,img=pb&&pb.images[envName()];
+  if(!img){const p=document.createElement('p');p.className='fl-warn';p.style.margin='0';p.textContent='No bundled firmware for '+envName()+' in firmware/prebuilt/. Use Build from source.';box.appendChild(p);return;}
+  const dl=document.createElement('dl');
+  const row=(k,v,c)=>{const dt=document.createElement('dt');dt.textContent=k;const dd=document.createElement('dd');dd.textContent=v;if(c)dd.className=c;dl.append(dt,dd);};
+  row('File','firmware/prebuilt/'+img.file);
+  row('Version','Blip '+pb.version+', built '+pb.built);
+  row('Size',kb(img.size)+' — bootloader, partition table and app, written at 0x0');
+  row('SHA-256',img.sha256,'fl-hash');
+  row('Source',pb.matches?'✓ built from exactly the source in this folder':'⚠ your source has changed since this was built — Build from source to include your changes',pb.matches?'fl-ok':'fl-warn');
+  box.appendChild(dl);
+  const chip=sel.board==='s3'?'esp32s3':'esp32c3';
+  const p=document.createElement('p');p.textContent='Blip checks the file against this checksum before writing, then runs: esptool --chip '+chip+(sel.port!=='auto'?' --port '+sel.port:'')+' write_flash 0x0 '+img.file;
+  box.appendChild(p);
+}
+function onPick(){if(!running()){buildSteps(MODES[sel.mode]);}renderFw();}
+
+// ---- stepper + job state
+function buildSteps(names){const ol=$('#flSteps');ol.textContent='';ol.dataset.names=names.join('|');names.forEach((n,i)=>{const li=document.createElement('li');li.className='todo';const ic=document.createElement('i');ic.textContent=String(i+1);li.append(ic,document.createTextNode(n));ol.appendChild(li);});}
+const mmss=s=>{s=Math.round(s);return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+function renderJob(){
+  const j=snap;if(!j)return;
+  const run=running();
+  root.classList.toggle('fl-busy',run);
+  const logOnly=j.mode==='log';
+  $('#flGo').disabled=run;$('#flGo').textContent=run&&!logOnly?(j.state==='monitoring'?'Flashed ✓':'Flashing…'):(diag()?'🩺 Flash the bench test':'⚡ Flash firmware');
+  $('#flUsbLog').disabled=run;$('#flUsbLog').textContent=run&&logOnly?'🔌 Watching…':'🔌 USB log';
+  $('#flStop').hidden=!run;$('#flStop').textContent=j.state==='monitoring'?'Stop watching':'Cancel';
+  $('#flPort').disabled=run;$('#flMon').disabled=run;
+  const names=j.steps.map(s=>s.name);
+  if(j.state!=='idle'&&$('#flSteps').dataset.names!==names.join('|')){if(run||sel.mode===j.mode)buildSteps(names);}
+  if($('#flSteps').dataset.names===names.join('|'))Array.from($('#flSteps').children).forEach((li,i)=>{
+    const st=(j.steps[i]||{}).status||'todo';li.className=st;
+    li.firstChild.textContent=st==='done'?'✓':st==='error'?'✕':String(i+1);
+  });
+  const bar=$('#flBar');bar.className='fl-bar';
+  if(j.state==='error'||j.state==='cancelled')bar.classList.add('bad');
+  if(run&&j.pct==null&&j.state==='running')bar.classList.add('ind');
+  bar.firstElementChild.style.width=(j.flashed?100:j.pct!=null?j.pct:(run?35:0))+'%';
+  $('#flAct').textContent=j.state==='monitoring'?'Watching the serial port…':j.state==='done'?'Done.':j.state==='cancelled'?'Cancelled.':j.state==='error'?'Stopped.':(j.activity||(run?'Working…':'Ready.'));
+  $('#flTime').textContent=run?mmss(j.elapsed):'';
+  // banner
+  const b=$('#flBanner');b.textContent='';
+  if(j.flashed){
+    const d=document.createElement('div');d.className='fl-banner ok';
+    if(/bench/.test(j.env||'')){d.innerHTML='<b>✓ Bench test flashed.</b><p>Its results print in the log below (stage 1 takes about 15 s). Stage 2 starts a hotspot named <code>Blip-Bench-…</code> (password <code>blipblip</code>): join it with a phone or laptop and the 2-minute run starts. If the board resets mid-run, the next start-up reports <b>Stage 2: FAILED</b> and how far it got. When you are done, use the <b>Flash Blip</b> tab to put Blip back.</p>';}
+    else d.innerHTML='<b>✓ Flashed.</b><p>Unplug and re-plug the board (or press RESET). On your phone join Wi-Fi <code>Blip-Radar</code>, password <code>blipblip</code> (unless you changed them), then open <code>http://192.168.4.1/</code>. This same page runs on the node.</p>';
+    if(j.image){const q=document.createElement('p');q.textContent='Wrote '+j.image.file+' (Blip '+j.image.version+', SHA-256 '+j.image.sha256.slice(0,16)+'…).';d.appendChild(q);}
+    else if(j.mode==='source'){const q=document.createElement('p');q.textContent='Wrote firmware built from this folder ('+j.env+').';d.appendChild(q);}
+    b.appendChild(d);
+  }else if(j.state==='error'||j.state==='cancelled'){
+    const d=document.createElement('div');d.className='fl-banner bad';
+    const s=j.steps[j.step]||{name:''};
+    d.innerHTML='<b></b><p></p>';d.firstChild.textContent=j.state==='cancelled'?'Cancelled':'That didn\'t work';
+    d.lastChild.textContent=j.state==='cancelled'?'Nothing was left half-written to the board unless it was mid-upload; just press Flash again.':'It stopped at “'+s.name+'”. '+(j.hints.length?'The tip below is the likely reason.':'The red lines in the log say why.');
+    b.appendChild(d);
+  }
+  // hints
+  const k=j.hints.map(h=>h.id).join(',');
+  if(k!==hintKey){hintKey=k;const hs=$('#flHints');hs.textContent='';
+    j.hints.forEach(h=>{const d=document.createElement('div');d.className='fl-banner tip';const t=document.createElement('b');t.textContent=h.title;const p=document.createElement('p');p.textContent=h.text;d.append(t,p);hs.appendChild(d);});}
+}
+
+// ---- log
+const logEl=$('#flLog');
+function cls(l){
+  if(l.startsWith('▸'))return'fl-note';
+  if(l.startsWith('$ '))return'fl-cmd';
+  if(/error|failed|fatal|traceback|denied|not found|\bFAILED\b/i.test(l))return'fl-err';
+  if(/SUCCESS|verified|^Wrote \d+ bytes|Leaving|Hard resetting/.test(l))return'fl-ok';
+  if(/^(Compiling|Linking|Building|Indexing|Archiving|Retrieving|Checking|Generating)/.test(l))return'fl-dim';
+  return'';
+}
+function appendLines(ls){
+  if(!ls.length)return;
+  const stick=logEl.scrollTop+logEl.clientHeight>=logEl.scrollHeight-40;
+  const f=document.createDocumentFragment();
+  ls.forEach(l=>{allLines.push(l);const d=document.createElement('div');d.textContent=l;const c=cls(l);if(c)d.className=c;f.appendChild(d);});
+  logEl.appendChild(f);
+  while(logEl.childElementCount>1500)logEl.removeChild(logEl.firstChild);
+  if(allLines.length>6000)allLines.splice(0,allLines.length-6000);
+  if(stick)logEl.scrollTop=logEl.scrollHeight;
+}
+$('#flClear').onclick=()=>{logEl.textContent='';};
+$('#flCopy').onclick=()=>{
+  const txt=allLines.join('\n'),btn=$('#flCopy');
+  const done=()=>{btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy',1200);};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(done,()=>{});
+  else{const t=document.createElement('textarea');t.value=txt;t.style.position='fixed';t.style.opacity='0';document.body.appendChild(t);t.select();try{document.execCommand('copy');done();}catch(e){}t.remove();}
+};
+
+// ---- talking to the simulator
+async function refreshInfo(){
+  info=await api('/api/flash/info');
+  if(!running()){pick($('#flBoards'),info.boards,'board');pickRadars();pick($('#flModes'),MODE_CARDS,'mode');}
+  renderPorts(info.ports);
+  $('#flMon').checked=!!sel.monitor;
+  renderFw();
+  root.querySelectorAll('[data-os]').forEach(e=>e.hidden=e.dataset.os!==info.os);
+}
+async function pollLog(){const j=await api('/api/flash/log?from='+cursor);snap=j;cursor=j.next;appendLines(j.lines);renderJob();}
+$('#flGo').onclick=async()=>{
+  try{
+    cursor=0;allLines=[];logEl.textContent='';hintKey='';$('#flHints').textContent='';
+    buildSteps(MODES[sel.mode]);
+    await post('/api/flash/start',{board:sel.board,radar:radarId(),port:sel.port,monitor:diag()?true:sel.monitor,mode:sel.mode});
+    await pollLog();
+  }catch(e){alert(e.message);}
+};
+$('#flUsbLog').onclick=async()=>{
+  try{
+    cursor=0;allLines=[];logEl.textContent='';hintKey='';$('#flHints').textContent='';
+    buildSteps(MODES.log);
+    await post('/api/flash/start',{board:sel.board,radar:radarId(),port:sel.port,monitor:true,mode:'log'});
+    await pollLog();
+  }catch(e){alert(e.message);}
+};
+$('#flStop').onclick=()=>post('/api/flash/cancel').then(()=>pollLog()).catch(e=>alert(e.message));
+
+async function loop(){
+  try{
+    if(!document.hidden){
+      if(running())await pollLog();
+      else if(active()||!info)await refreshInfo();
+    }
+  }catch(e){$('#flAct').textContent='Lost contact with the simulator: '+e.message;}
+  setTimeout(loop,running()?350:2000);
+}
+renderTab();
+buildSteps(MODES[sel.mode]);
+(async()=>{try{await refreshInfo();await pollLog();}catch(e){}loop();})();
+})();
+</script>
+</body></html>

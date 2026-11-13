@@ -1,0 +1,588 @@
+<!doctype html>
+<!--
+  Blip — phone web UI for the RD-03D radar node
+  Required Notice: Copyright Matthew Armstrong (https://github.com/The-Dorkknight)
+  Licensed under the PolyForm Noncommercial License 1.0.0. No warranty.
+  This single file is gzipped into firmware/include/web_ui.h by tools/embed_web.py.
+  WORK IN PROGRESS: MANY FEATURES MAY BE BROKEN.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06120b">
+<title>Blip radar</title>
+<style>
+:root{--bg:#06120b;--panel:#0b1d12;--line:#1b3a26;--ph:#39ff8a;--ph2:#1f9c56;--dim:#7fb597;--txt:#d9f5e3;--warn:#ffb347;--bad:#ff5c5c;--t1:#39ff8a;--t2:#5ad0ff;--t3:#ffd34d}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-text-size-adjust:100%}
+header{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.toflash{font-size:12px;color:#ff8a99;border:1px solid #6b2230;border-radius:999px;padding:4px 10px;text-decoration:none;letter-spacing:.04em}
+header h1{font-size:17px;margin:0;letter-spacing:.08em;color:var(--ph)}
+header .st{margin-left:auto;font-size:12px;color:var(--dim);text-align:right;line-height:1.2}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad);margin-right:5px;vertical-align:middle}
+.dot.ok{background:var(--ph);box-shadow:0 0 8px var(--ph)}
+.dot.sim{background:var(--warn)}
+nav{display:flex;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:46px;z-index:5}
+nav button{flex:1;background:none;border:0;border-bottom:3px solid transparent;color:var(--dim);padding:10px 4px;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+nav button.on{color:var(--ph);border-bottom-color:var(--ph)}
+main{padding:12px 14px 40px;max-width:720px;margin:0 auto}
+section{display:none}section.on{display:block}
+.diag{border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:13px;margin-bottom:10px;line-height:1.45}
+.diag.warn{border-color:var(--warn);color:#ffd9a8}.diag.bad{border-color:var(--bad);color:#ffc1c1}
+.nodelog{max-height:340px;overflow:auto;font-size:11px;line-height:1.35;white-space:pre-wrap;word-break:break-word;background:#020a05;border:1px solid var(--line);border-radius:6px;padding:8px}
+.diag a.loglink{color:inherit;text-decoration:underline;cursor:pointer}
+.diag button.b{padding:3px 10px;margin-left:6px}
+.wip{background:#3a2a00;color:#ffd27a;border:1px solid #7a5a00;padding:6px 10px;border-radius:6px;font-size:12px;margin-bottom:10px}
+canvas#scope{width:100%;aspect-ratio:1/0.62;display:block;background:radial-gradient(ellipse at 50% 100%,#0c2416 0%,var(--bg) 70%);border:1px solid var(--line);border-radius:8px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 140px;min-width:0}
+.card .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.card .v{font-size:22px;font-variant-numeric:tabular-nums;color:var(--ph)}
+.card .v small{font-size:12px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--dim);font-weight:500;font-size:12px;text-transform:uppercase}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+button.b,label.b{background:var(--panel);border:1px solid var(--ph2);color:var(--txt);padding:9px 14px;border-radius:8px;font-size:14px;min-height:40px}
+button.b.on{background:#0f3a22;border-color:var(--ph);color:var(--ph)}
+button.b.danger{border-color:var(--bad);color:var(--bad)}
+.field{display:flex;flex-direction:column;gap:4px;margin:10px 0}
+.field label{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
+.field label span{text-transform:none}
+.field input,.field select{background:#071a0f;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:15px;min-height:40px}
+.seg{display:flex;border:1px solid var(--ph2);border-radius:8px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;color:var(--dim);padding:9px 4px;font-size:14px;min-height:40px}
+.seg button.on{background:#0f3a22;color:var(--ph)}
+canvas#strip,canvas#spec{width:100%;height:160px;display:block;background:#071a0f;border:1px solid var(--line);border-radius:8px}
+input[type=range]{width:100%;accent-color:var(--ph)}
+.muted{color:var(--dim);font-size:13px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal .box{background:var(--panel);border:1px solid var(--ph2);border-radius:10px;padding:16px;max-width:460px;font-size:14px}
+.modal h2{margin:0 0 8px;color:var(--ph);font-size:17px}
+footer{text-align:center;font-size:11px;color:var(--dim);padding:20px 14px;border-top:1px solid var(--line)}
+a{color:var(--ph)}
+pre{background:#071a0f;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>BLIP</h1>
+  <a id="toFlash" class="toflash" href="/" hidden title="Back to the flasher">⚡ Flasher</a>
+  <div class="st"><span class="dot" id="dot"></span><span id="conn">connecting…</span><br><span id="fps"></span></div>
+</header>
+<nav>
+  <button class="on" data-t="scope">Scope</button>
+  <button data-t="targets">Targets</button>
+  <button data-t="stetho">Stetho</button>
+  <button data-t="settings">Settings</button>
+  <button data-t="about">About</button>
+</nav>
+<main>
+<div class="wip">WORK IN PROGRESS: MANY FEATURES MAY BE BROKEN — v<span class="ver">0.2.2-wip</span> · built <span class="bd">—</span></div>
+
+<section id="scope" class="on">
+  <canvas id="scope"></canvas>
+  <div class="row">
+    <div class="card"><div class="k">Targets</div><div class="v" id="nT">0</div></div>
+    <div class="card"><div class="k">Nearest</div><div class="v" id="nD">—<small> m</small></div></div>
+    <div class="card"><div class="k">Speed</div><div class="v" id="nV">—<small> cm/s</small></div></div>
+  </div>
+  <div class="row"><div class="seg modeSeg"><button data-mode="single">Track 1 (nearest)</button><button data-mode="multi">Track 3</button></div></div>
+  <div class="row">
+    <button class="b" id="beep">🔈 Tracker ping: off</button>
+    <button class="b" id="trail">Trails: on</button>
+    <button class="b" id="flip">Mirror L/R</button>
+    <button class="b" id="showH" hidden>Show filtered</button>
+  </div>
+  <p class="muted">Sector is ±60° azimuth, rings every 2 m to 8 m. The RD-03D only reports <b>moving</b> people; someone standing dead still fades out. Tracker ping speeds up and rises in pitch as the nearest person approaches.</p>
+</section>
+
+<section id="targets">
+  <table><thead><tr><th>#</th><th>Dist m</th><th>Angle °</th><th>Speed cm/s</th><th>x mm</th><th>y mm</th><th>Gate mm</th></tr></thead><tbody id="tbody"></tbody></table>
+  <p class="muted">Angle: + is to the radar's left when you stand behind it looking out (the module's own convention). Speed: − approaching, + moving away. "Gate" is the module's reported range-cell size.</p>
+  <pre id="rawj"></pre>
+</section>
+
+<section id="stetho">
+  <div class="wip">Experiment. <b>Not a medical device</b> — never use this for any health decision. Needs a CDM324/HB100 module and a MAX4466 board (see hardware/max4466-mod.md).</div>
+  <div class="diag" id="stdiag">Asking the node about the Stetho channel…</div>
+  <div class="seg" id="presetSeg"><button data-p="heart">Heart</button><button data-p="lungs">Lungs</button><button data-p="voice">Voice</button><button data-p="wide">Wide</button><button data-p="raw">Raw</button></div>
+  <div class="row" style="margin-top:8px">
+    <div class="seg" style="flex:1 1 100%"><button class="on" data-view="audio">Sound 8 kHz</button><button data-view="vitals">Chest motion 100 Hz</button></div>
+  </div>
+  <canvas id="strip"></canvas>
+  <div class="row">
+    <div class="card"><div class="k">Heart</div><div class="v" id="bpm">—<small> bpm</small></div></div>
+    <div class="card"><div class="k">Breath</div><div class="v" id="brpm">—<small> /min</small></div></div>
+    <div class="card"><div class="k">AGC · noise cut</div><div class="v" id="agcv">—<small> dB</small></div></div>
+    <div class="card"><div class="k">Delay</div><div class="v" id="lat">—<small> ms</small></div></div>
+  </div>
+  <div class="row">
+    <button class="b" id="listen">🎧 Listen on phone</button>
+    <button class="b" id="thump">Beat thumps: off</button>
+    <button class="b" id="gate" title="Quietens the sound between beats (heart) or between breaths (lungs) once a steady rhythm is found. Off by default.">Beat lock: off</button>
+    <button class="b" id="rec">⏺ Record 10 s → WAV</button>
+    <span class="muted" id="bumpInd" style="align-self:center"></span>
+  </div>
+  <p class="muted" id="prNote" style="margin:4px 0 0">Rates show a <b>?</b> while the rhythm is only roughly steady, and nothing when no rhythm is found.</p>
+  <div class="field"><label>Phone volume</label><input type="range" id="vol" min="0" max="100" value="70"></div>
+  <details open><summary class="muted" style="cursor:pointer">Clean-up on the node</summary>
+    <div class="field"><label>Noise suppression <span id="nsV"></span></label><input type="range" id="ns" min="0" max="100" value="60"></div>
+    <div class="field"><label>Bump rejection <span id="bumpV"></span></label><input type="range" id="bumpS" min="0" max="100" value="50"></div>
+    <div class="field"><label>Automatic gain</label><div class="seg" id="agcSeg"><button data-agc="1">AGC on</button><button data-agc="0">Manual</button></div></div>
+    <div class="field" id="maxgF"><label>AGC max gain <span id="maxgV"></span></label><input type="range" id="maxg" min="0" max="48" value="36"></div>
+    <div class="field" id="gainF" hidden><label>Manual gain <span id="gainV"></span></label><input type="range" id="gain" min="0" max="48" value="12"></div>
+  </details>
+  <details><summary class="muted" style="cursor:pointer">Experiments: sampling and burst blanker (for hunting static)</summary>
+    <div class="field"><label>ADC sampling</label><div class="seg" id="osSeg"><button data-os="0">Normal</button><button data-os="2">2× average</button><button data-os="4">4× average</button><button data-os="8">8× average</button></div></div>
+    <div class="field"><label>Burst blanker (Heart and Lungs presets)</label><div class="seg" id="nbSeg"><button data-nb="1">On</button><button data-nb="0">Off</button></div></div>
+    <p class="muted">Averaging takes several ADC readings per sample and drops the extremes, which removes short spikes before they are heard. Changing it restarts the Stetho channel for a moment. For a record-and-compare test: choose a setting, press Record, then repeat with the other. Record in the <b>Raw</b> preset to hear what the ADC itself delivers.</p>
+  </details>
+  <details><summary class="muted" style="cursor:pointer">Sound out of the node itself</summary>
+    <div class="field"><label>Node audio output</label><div class="seg" id="outSeg"><button data-out="0">None</button><button data-out="1">3.5 mm earphones</button><button data-out="2">I2S amp</button></div></div>
+    <div class="field"><label>Node volume <span id="ovolV"></span></label><input type="range" id="ovol" min="0" max="100" value="60"></div>
+    <p class="muted">Earphones: delta-sigma on one pin through an RC filter. I2S amp: a MAX98357A-style board. One at a time. Works with no phone connected.</p>
+  </details>
+  <p class="muted" id="stmsg">Stetho channel is off. Enable it in Settings once the module and MAX4466 board are wired to the ADC pin.</p>
+  <p class="muted"><b>Heart</b> lifts 20–150 Hz (S1/S2 heart sounds), <b>Lungs</b> 100–1500 Hz, <b>Voice</b> the larynx buzz while someone talks, <b>Wide</b> everything, <b>Raw</b> the plain Doppler audio (walking people warble, about 160 Hz per m/s at 24 GHz). Knocks and bumps are ducked before they reach your ears. Use headphones near the node or you will hear feedback from the phone speaker.</p>
+</section>
+
+<section id="settings">
+  <div class="field"><label>Radar tracking mode</label>
+    <div class="seg modeSeg" id="modeSeg"><button data-mode="multi">Multi (3 people)</button><button data-mode="single">Single (nearest)</button></div></div>
+  <div class="field"><label>Target filter</label>
+    <div class="seg" id="filtSeg"><button data-f="raw">Raw (module)</button><button data-f="smart">Smart (experimental)</button></div></div>
+  <p class="muted" id="filtMsg">Smart: Blip's own tracker on top of the module — stable ids, smoothing, hides one-frame flickers, wall reflections and things that wobble in place (fans, curtains). Use <b>Show filtered</b> on the Scope to see what it hides.</p>
+  <div class="row"><button class="b" id="forget">Forget learned clutter</button></div>
+  <div class="field"><label>Auto-sleep when nobody is watching or listening</label>
+    <select id="sleepSel"><option value="0">Never</option><option value="2">2 min</option><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option></select></div>
+  <div class="field"><label>OLED display on the node</label>
+    <select id="oledSel"><option value="3">Auto-detect at boot (assumes 128×64)</option><option value="0">None</option><option value="1">0.91" 128×32 SSD1306</option><option value="2">0.96" 128×64 SSD1306</option></select></div>
+  <div class="field"><label>Stetho channel (CW Doppler IF input)</label>
+    <div class="seg" id="stSeg"><button data-st="0">Off</button><button data-st="1">On</button></div></div>
+  <div class="field" id="roffF" hidden><label>Switch the RD-03D off while listening (stops 24 GHz interference with a CDM324)</label>
+    <div class="seg" id="roffSeg"><button data-roff="0">Keep tracking</button><button data-roff="1">Radar off</button></div></div>
+  <div class="field"><label>Wi-Fi transmit power</label>
+    <div class="seg" id="txpSeg"><button data-txp="0">Low 8.5 dBm</button><button data-txp="1">Mid 15 dBm</button><button data-txp="2">Full 19.5 dBm</button></div></div>
+  <p class="muted">ESP32-C3 Super Mini boards have a weak antenna: at full power many phones struggle to join or drop out, so Low is their default. Raise it only if the phone is far away and connects fine.</p>
+  <details class="field" id="logBox"><summary>Node log (what the node did; survives a crash, not a power cut)</summary>
+    <div class="row" style="margin:8px 0"><button class="b" id="logRefresh">Refresh</button><button class="b" id="logSave">Save as file</button></div>
+    <pre id="nodeLog" class="nodelog">open to load…</pre>
+    <p class="muted">A <i>health</i> line every 10 s shows free memory, who is connected and the Stetho numbers. If the node stops answering, open this after it comes back: the lines before the problem are still here.</p>
+  </details>
+  <div class="field"><label>Hotspot name (SSID)</label><input id="ssid" maxlength="32"></div>
+  <div class="field"><label>Hotspot password (8–63 chars)</label><input id="pass" maxlength="63"></div>
+  <div class="row"><button class="b on" id="saveWifi">Save Wi-Fi &amp; reboot</button><button class="b danger" id="reboot">Reboot node</button></div>
+  <p class="muted">Mode, OLED and Stetho apply immediately and are remembered. Wi-Fi changes need a reboot; reconnect your phone to the new name afterwards.</p>
+</section>
+
+<section id="about">
+  <h3 style="color:var(--ph);margin:6px 0">Blip <span class="ver">0.2.2-wip</span></h3>
+  <p>One small ESP32 reads an Ai-Thinker RD-03D 24 GHz radar and shows up to three moving people on this page, served from the node's own Wi-Fi hotspot. No app, no internet, no second microcontroller.</p>
+  <pre id="status">loading…</pre>
+  <p class="muted">Required Notice: Copyright Matthew Armstrong (<a href="https://github.com/The-Dorkknight/blip-radar">github.com/The-Dorkknight/blip-radar</a>). Licensed under the PolyForm Noncommercial License 1.0.0. Source-available, non-commercial. No warranty, no liability. Not a medical device. Inspired by Stevee87's Arduino-ESP32-Radarproject.</p>
+</section>
+</main>
+<footer>Blip <span class="ver">0.2.2-wip</span> · work in progress · built <span id="bdate">—</span></footer>
+
+<div class="modal" id="disc" hidden>
+  <div class="box">
+    <h2>Before you start</h2>
+    <p>This is hobby software, <b>work in progress, many features may be broken</b>. It is <b>not a medical device</b>: the "Stetho" screen is a physics experiment, not a monitor of anyone's health. Radar can see motion through thin walls — respect other people's privacy and your local rules on 24 GHz devices.</p>
+    <label style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="agreeChk"> I understand</label>
+    <button class="b" id="agreeBtn" disabled>Continue</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const COL=['#39ff8a','#5ad0ff','#ffd34d'];
+const RANGE=8000;             // mm to the outer ring
+let status=null, targets=[], alive=false, lastMsg=0, sim=false;
+let trails=true, mirror=false, beepOn=false, view='audio';
+
+// ---- first-start disclaimer (localStorage inside try/catch; if storage fails it shows every time)
+(function(){let ok=false;try{ok=localStorage.getItem('blip.agreed')==='1'}catch(e){}
+ if(!ok){$('#disc').hidden=false;$('#agreeChk').onchange=e=>$('#agreeBtn').disabled=!e.target.checked;
+ $('#agreeBtn').onclick=()=>{try{localStorage.setItem('blip.agreed','1')}catch(e){}$('#disc').hidden=true;}}})();
+
+// ---- tabs
+$$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+ $$('main section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));if(b.dataset.t==='scope')sizeScope();if(b.dataset.t==='stetho')sizeStrip();});
+
+// ---- On the PC the flasher is the home page ("/") and this simulator is at /sim: show a way back.
+function loadFlasher(){$('#toFlash').hidden=false;}
+
+// ---- connection: WebSocket first, polling fallback
+let ws=null, pollTimer=null, wsOpens=0;
+function setConn(t,ok){$('#conn').textContent=t;$('#dot').className='dot'+(ok?' ok':'')+(sim?' sim':'');}
+function connect(){
+  try{ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');}catch(e){startPoll();return;}
+  ws.binaryType='arraybuffer';
+  ws.onopen=()=>{wsOpens++;setConn('live',true);if(pollTimer){clearInterval(pollTimer);pollTimer=null;}};
+  ws.onmessage=ev=>{if(typeof ev.data==='string'){const j=JSON.parse(ev.data);if(j.app){gotStatus(j);}else gotTargets(j);}else gotPacket(ev.data);};
+  ws.onclose=()=>{setConn('reconnecting…',false);setTimeout(connect,1500);startPoll();};
+  ws.onerror=()=>{try{ws.close()}catch(e){}};
+}
+function startPoll(){if(pollTimer)return;pollTimer=setInterval(()=>fetch('/api/targets').then(r=>r.json()).then(gotTargets).catch(()=>{}),200);}
+function fetchStatus(){fetch('/api/status').then(r=>r.json()).then(gotStatus).catch(()=>{});}
+let statusAt=0;
+function gotStatus(j){status=j;statusAt=Date.now();sim=!!j.sim;if(j.flash)loadFlasher();
+  $('#status').textContent=JSON.stringify(j,null,1);
+  $$('.ver').forEach(e=>e.textContent=j.version||'');$('#bdate').textContent=j.build||'';$$('.bd').forEach(e=>e.textContent=j.build||'—');
+  $('#ssid').value=j.ssid||'';$('#pass').value='';
+  $$('.modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===(j.radar&&j.radar.mode)));
+  $('#oledSel').value=String(j.oled||0);
+  const S=j.stetho||{},st=!!S.enabled;$$('#stSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.st==='1')===st));
+  $('#stmsg').textContent=st?('Stetho: '+(S.rate||8000)+' Hz from GPIO'+S.pinI+', '+(S.frame||128)+'-sample packets'+(S.dropped?(', '+S.dropped+' packets dropped on the node'):'')+'.'):'Stetho channel is off. Enable it in Settings once the module and MAX4466 board are wired to the ADC pin (see hardware/max4466-mod.md).';
+  stethoUi(S);stDiag(S);
+  const R=j.radar||{};$$('#filtSeg button').forEach(b=>b.classList.toggle('on',b.dataset.f===(R.filter||'raw')));$('#showH').hidden=R.filter!=='smart';$('#forget').hidden=R.filter!=='smart';
+  $('#sleepSel').value=String(j.sleepMin||0);$$('#txpSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.txp===j.txp));$('#roffF').hidden=!(R.pwrPin>=0);$$('#roffSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.roff==='1')===!!R.offWhileListening));
+  setConn(sim?'simulator':(ws&&ws.readyState===1?'live':'polling'),true);
+}
+function gotTargets(j){lastMsg=Date.now();alive=!!j.alive;targets=j.t||[];hidden=j.h||[];filterMode=j.f||'raw';
+  $('#fps').textContent=j.sleep?'radar asleep':alive?('radar '+(j.fps||0)+' fps'+(filterMode==='smart'?' · smart':'')):'no radar data';
+  if(!alive)$('#dot').classList.remove('ok');else if(!$('#dot').classList.contains('ok'))$('#dot').classList.add('ok');
+  updateCards();updateTable();}
+connect();fetchStatus();
+// The node pushes its status over the WebSocket every second; only ask over HTTP when that isn't open.
+setInterval(()=>{if(!ws||ws.readyState!==1||Date.now()-statusAt>5000)fetchStatus();},2500);
+setInterval(()=>{if(status&&$('#stetho').classList.contains('on'))stDiag(status.stetho);},1000);   // keep the "no update for N s" line honest   // also if pushes stop arriving
+
+// ---- settings
+function cfg(q){return fetch('/api/config?'+q).then(r=>r.json()).then(gotStatus).catch(()=>alert('Node did not answer'));}
+$$('.modeSeg button').forEach(b=>b.onclick=()=>cfg('mode='+b.dataset.mode));
+$('#oledSel').onchange=e=>cfg('oled='+e.target.value);
+$$('#stSeg button').forEach(b=>b.onclick=()=>cfg('stetho='+b.dataset.st));
+$$('#roffSeg button').forEach(b=>b.onclick=()=>cfg('radarOff='+b.dataset.roff));
+$$('#filtSeg button').forEach(b=>b.onclick=()=>cfg('filter='+b.dataset.f));
+$('#forget').onclick=()=>cfg('forget=1');
+$('#sleepSel').onchange=e=>cfg('sleep='+e.target.value);
+$$('#txpSeg button').forEach(b=>b.onclick=()=>cfg('txp='+b.dataset.txp));
+let logText='';
+function loadLog(){return fetch('/api/log',{cache:'no-store'}).then(r=>r.text()).then(t=>{logText=t;const p=$('#nodeLog');const end=p.scrollTop+p.clientHeight>=p.scrollHeight-8;p.textContent=t||'(empty)';if(end)p.scrollTop=p.scrollHeight;}).catch(()=>{$('#nodeLog').textContent='the node did not answer';});}
+$('#logBox').addEventListener('toggle',e=>{if(e.target.open)loadLog();});
+$('#logRefresh').onclick=loadLog;
+$('#logSave').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([logText],{type:'text/plain'}));a.download='blip-log-'+new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')+'.txt';a.click();};
+setInterval(()=>{if($('#logBox').open&&$('#settings').classList.contains('on')&&!document.hidden)loadLog();},5000);
+function openLog(){const b=$('nav button[data-t="settings"]');if(b)b.click();const d=$('#logBox');d.open=true;loadLog();setTimeout(()=>d.scrollIntoView({behavior:'smooth'}),50);}
+$('#saveWifi').onclick=()=>{const s=$('#ssid').value.trim(),p=$('#pass').value;if(!s){alert('Enter a hotspot name');return;}if(p&&p.length<8){alert('Password needs 8+ characters');return;}
+ if(!confirm('Reboot the node with hotspot "'+s+'"? You will have to reconnect your phone.'))return;cfg('ssid='+encodeURIComponent(s)+(p?'&pass='+encodeURIComponent(p):''));};
+$('#reboot').onclick=()=>{if(confirm('Reboot the radar node?'))fetch('/api/reboot').catch(()=>{});};
+
+// ---- cards + table
+function updateCards(){$('#nT').textContent=targets.length;let n=null;targets.forEach(t=>{if(!n||t.d<n.d)n=t;});
+ $('#nD').innerHTML=n?(n.d/1000).toFixed(2)+'<small> m</small>':'—<small> m</small>';
+ $('#nV').innerHTML=n?(n.v>0?'+':'')+n.v+'<small> cm/s</small>':'—<small> cm/s</small>';tick(n);}
+function updateTable(){const tb=$('#tbody');tb.innerHTML=targets.map(t=>`<tr><td><span class="sw" style="background:${col(t.id)}"></span>${t.id}</td><td>${(t.d/1000).toFixed(2)}</td><td>${(mirror?-t.a:t.a).toFixed(0)}</td><td>${t.v}</td><td>${t.x}</td><td>${t.y}</td><td>${t.res}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">no moving targets</td></tr>';
+ $('#rawj').textContent=JSON.stringify({alive,t:targets});}
+
+// ---- scope drawing
+const sc=$('canvas#scope'),ctx=sc.getContext('2d');let W=0,H=0,dpr=1,hist={},sweep=0,hidden=[],showHidden=false,filterMode='raw';
+const col=id=>COL[(id-1)%3];
+function sizeScope(){if(!sc.clientWidth)return;   // hidden tab (width 0): keep the last size, or the arcs below get negative radii
+  dpr=window.devicePixelRatio||1;W=sc.clientWidth;H=Math.round(W*0.62);sc.width=W*dpr;sc.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+window.addEventListener('resize',sizeScope);sizeScope();
+function toPx(x,y){const cx=W/2,cy=H-6,R=Math.min(W/2-8,H-14);const sx=(mirror?1:-1)*x/RANGE*R,sy=y/RANGE*R;return[cx+sx,cy-sy,R,cx,cy];}
+function drawScope(){
+  if(W<40)return;
+  const [,,R,cx,cy]=toPx(0,0);ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#1f6b3f';ctx.lineWidth=1;ctx.fillStyle='#7fb597';ctx.font='11px system-ui';ctx.textAlign='center';
+  for(let i=1;i<=4;i++){const r=R*i/4;ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2-Math.PI/3,-Math.PI/2+Math.PI/3);ctx.stroke();ctx.fillText((i*2)+' m',cx+r*Math.sin(Math.PI/3)+16,cy-r*Math.cos(Math.PI/3)+4);}
+  for(let a=-60;a<=60;a+=30){const t=a*Math.PI/180;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.sin(t),cy-R*Math.cos(t));ctx.stroke();}
+  ctx.fillText('L',cx-R*Math.sin(Math.PI/3)-12,cy-R*Math.cos(Math.PI/3)-6);ctx.fillText('R',cx+R*Math.sin(Math.PI/3)+12,cy-R*Math.cos(Math.PI/3)-6);
+  // sweep
+  sweep=(sweep+1.2)%120;const sa=(sweep-60)*Math.PI/180;const g=ctx.createLinearGradient(cx,cy,cx+R*Math.sin(sa),cy-R*Math.cos(sa));g.addColorStop(0,'rgba(57,255,138,0)');g.addColorStop(1,'rgba(57,255,138,.35)');
+  ctx.strokeStyle=g;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.sin(sa),cy-R*Math.cos(sa));ctx.stroke();
+  // trails + blips
+  const stale=Date.now()-lastMsg>1500;
+  targets.forEach(t=>{const h=hist[t.id]||(hist[t.id]=[]);h.push([t.x,t.y,Date.now()]);while(h.length>40)h.shift();});
+  for(const id in hist){const h=hist[id],cl=col(+id);hist[id]=h.filter(p=>Date.now()-p[2]<4000);if(!hist[id].length){delete hist[id];continue;}
+    if(trails)hist[id].forEach(p=>{const age=(Date.now()-p[2])/4000;const[px,py]=toPx(p[0],p[1]);ctx.fillStyle=cl;ctx.globalAlpha=0.35*(1-age);ctx.beginPath();ctx.arc(px,py,3,0,7);ctx.fill();});ctx.globalAlpha=1;}
+  if(!stale&&showHidden)hidden.forEach(h=>{const[px,py]=toPx(h.x,h.y);ctx.strokeStyle='#7fb597';ctx.setLineDash([3,3]);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(px,py,8,0,7);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#7fb597';ctx.font='11px system-ui';ctx.textAlign='left';ctx.fillText(h.why,px+11,py+4);});
+  if(!stale)targets.forEach(t=>{const[px,py]=toPx(t.x,t.y),col=COL[(t.id-1)%3];
+    ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(px,py,7,0,7);ctx.fill();ctx.shadowBlur=0;
+    // velocity arrow along the line of sight (radial speed)
+    const ang=Math.atan2(px-cx,cy-py),len=Math.max(-40,Math.min(40,t.v*0.6));ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+len*Math.sin(ang),py-len*Math.cos(ang));ctx.stroke();
+    ctx.fillStyle='#d9f5e3';ctx.textAlign='left';ctx.font='12px system-ui';ctx.fillText(t.id+'  '+(t.d/1000).toFixed(1)+' m  '+(t.v>0?'+':'')+t.v,px+10,py-8);});
+  if(stale||!alive){ctx.fillStyle='rgba(6,18,11,.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ffb347';ctx.font='15px system-ui';ctx.textAlign='center';ctx.fillText(stale?'no data from node':'radar not sending — check 5 V and TX/RX',cx,H/2);}
+  requestAnimationFrame(drawScope);}
+requestAnimationFrame(drawScope);
+$('#trail').onclick=e=>{trails=!trails;e.target.textContent='Trails: '+(trails?'on':'off');};
+$('#flip').onclick=e=>{mirror=!mirror;e.target.classList.toggle('on',mirror);};
+$('#showH').onclick=e=>{showHidden=!showHidden;e.target.classList.toggle('on',showHidden);};
+
+// ---- tracker ping (WebAudio, like the original project's buzzer)
+let ac=null;function audio(){if(!ac){ac=new (window.AudioContext||window.webkitAudioContext)();}if(ac.state==='suspended')ac.resume();return ac;}
+let nextPing=0;
+function tick(n){if(!beepOn||!n)return;const now=Date.now();if(now<nextPing)return;
+  const d=Math.min(8000,Math.max(300,n.d));const period=120+(900-120)*(d-300)/7700,freq=1800-(1800-700)*(d-300)/7700;nextPing=now+period;
+  const a=audio(),o=a.createOscillator(),g=a.createGain();o.type='square';o.frequency.value=freq;g.gain.value=0.0001;o.connect(g).connect(a.destination);
+  const t=a.currentTime;g.gain.exponentialRampToValueAtTime(0.25*(+$('#vol').value/100),t+0.005);g.gain.exponentialRampToValueAtTime(0.0001,t+0.07);o.start(t);o.stop(t+0.08);}
+$('#beep').onclick=e=>{beepOn=!beepOn;if(beepOn)audio();e.target.textContent='🔈 Tracker ping: '+(beepOn?'on':'off');e.target.classList.toggle('on',beepOn);};
+
+// ---- Stetho ------------------------------------------------------------------
+// The node sends two binary packet types (little-endian):
+//   'A' flags seq16 agc_dB ns_dB + int16[N]  cleaned-up audio, 8 kHz
+//   'V' flags seq16 0 0          + int16[10] raw chest motion, 100 Hz
+//   flags bit0 = bump being ducked, bit1 = output clipped, bit2 = ADC at a rail
+const AFS=8000,VFS=100;
+const strip=$('#strip'),sx=strip.getContext('2d');let SW=0,SH=0;
+function sizeStrip(){const d=window.devicePixelRatio||1;SW=strip.clientWidth;SH=strip.clientHeight;strip.width=SW*d;strip.height=SH*d;sx.setTransform(d,0,0,d,0,0);}
+window.addEventListener('resize',sizeStrip);sizeStrip();
+function biquad(type,f0,Q,fs){const w=2*Math.PI*f0/fs,cw=Math.cos(w),sw=Math.sin(w),al=sw/(2*Q);let b0,b1,b2,a0=1+al,a1=-2*cw,a2=1-al;
+  if(type==='lp'){b0=(1-cw)/2;b1=1-cw;b2=(1-cw)/2;}else{b0=(1+cw)/2;b1=-(1+cw);b2=(1+cw)/2;}
+  const c=[b0/a0,b1/a0,b2/a0,a1/a0,a2/a0];let x1=0,x2=0,y1=0,y2=0;return v=>{const y=c[0]*v+c[1]*x1+c[2]*x2-c[3]*y1-c[4]*y2;x2=x1;x1=v;y2=y1;y1=y;return y;};}
+// chest-motion filters at 100 Hz
+const fHp=biquad('hp',0.1,0.7,VFS),fLp=biquad('lp',5,0.7,VFS),fH1=biquad('hp',0.8,0.7,VFS),fH2=biquad('hp',0.8,0.7,VFS),fH3=biquad('lp',3,0.7,VFS);
+const vis=[],visBump=[],heartBuf=[];const VISN=VFS*8;
+const env=[];const ENVN=Math.round(8*AFS/128);       // min/max per audio packet, 8 s
+let bpmEst=null,brEst=null,lastBeat=0,thump=false,listening=false,lastV=0,bumpUntil=0,aSeq=-1,lost=0;
+
+/*PR-BEGIN*/
+// ---- Pattern recognition: heart and breath cycles ---------------------------------------------------------------------------
+// (host-tested: tests/test_vitals_pr.js pulls this block out of the page and runs it under Node)
+// CycleTracker finds a repeating pattern in a slow signal: a coarse period from the autocorrelation (with a check that it is not a
+// half or double period), the fine period and the shape of one cycle by epoch folding over the last few seconds, weighted towards the
+// newest. It says how sure it is (q, 0..1), where in the cycle any moment falls, and which parts of the cycle are normally quiet.
+// It only ever describes what is repeating: with nothing repeating q stays low and nothing downstream acts on it.
+class CycleTracker{
+  constructor(o){
+    this.rate=o.rate;this.minP=o.minP;this.maxP=o.maxP;this.win=o.win;this.hop=o.hop;this.B=o.bins||40;this.dil=o.dilate||0;this.sm=o.smooth||0;this.halfLife=o.halfLife||o.win/2;
+    this.N=Math.round(this.win*this.rate);this.buf=new Float32Array(this.N);this.bad=new Uint8Array(this.N);
+    this.hopN=Math.max(1,Math.round(this.hop*this.rate));this.reset();
+  }
+  reset(){this.total=0;this.since=0;this.P=0;this.q=0;this.locked=false;this.weak=false;this.weakRun=0;this.okRun=0;this.badRun=0;this.hist=[];this.contrast=0;this.r=0;this.phi0=0;
+    this.tpl=new Float32Array(this.B);this.open=new Float32Array(this.B).fill(1);this.updates=0;}
+  push(e,bad){this.buf[this.total%this.N]=e;this.bad[this.total%this.N]=bad?1:0;this.total++;if(++this.since>=this.hopN){this.since=0;this.update();}}
+  noLock(){this.q*=0.5;this.badRun++;this.okRun=0;this.weakRun=0;this.weak=false;if(this.badRun>=3)this.locked=false;}
+  update(){
+    const n=Math.min(this.total,this.N);if(n<this.N*0.6)return;
+    const x=new Float32Array(n),ok=new Uint8Array(n);let s=0,c=0;
+    for(let i=0;i<n;i++){const j=(this.total-n+i)%this.N;x[i]=this.buf[j];ok[i]=this.bad[j]?0:1;if(ok[i]){s+=x[i];c++;}}
+    if(c<n*0.5){this.noLock();return;}
+    const mean=s/c;let v=0;for(let i=0;i<n;i++)if(ok[i])v+=(x[i]-mean)*(x[i]-mean);
+    const sd=Math.sqrt(v/c);if(!(sd>1e-9)){this.noLock();return;}
+    for(let i=0;i<n;i++){let d=ok[i]?x[i]-mean:0;if(d>4*sd)d=4*sd;else if(d<-4*sd)d=-4*sd;x[i]=d;}     // bad samples count as "average"; outliers are clipped
+    if(this.sm){const y=new Float32Array(n),k=this.sm;let wsum=0;for(let j=-k;j<=k;j++)wsum+=k+1-Math.abs(j);     // triangular smoothing: the repeat peaks get wide enough that a half-sample misfit costs little
+      for(let i=0;i<n;i++){let a=0,w=0;for(let j=-k;j<=k;j++){const t=i+j;if(t<0||t>=n)continue;const g=k+1-Math.abs(j);a+=g*x[t];w+=g;}y[i]=a/w;}x.set(y);}
+    const minL=Math.max(2,Math.floor(this.minP*this.rate)),maxL=Math.ceil(this.maxP*this.rate),lagTop=Math.min(2*maxL,n>>1);
+    if(lagTop<minL+3){this.noLock();return;}
+    let e0=0;for(let i=0;i<n;i++)e0+=x[i]*x[i];
+    const r=new Float32Array(lagTop+2);
+    for(let L=minL;L<=lagTop;L++){let a=0;for(let i=L;i<n;i++)a+=x[i]*x[i-L];r[L]=a/e0*n/(n-L);}
+    const top=Math.min(maxL,lagTop),sc=new Float32Array(top+2);
+    for(let L=minL;L<=top;L++)sc[L]=r[L]+0.5*(2*L<=lagTop?r[2*L]:r[L]);
+    let Lb=0,best=0;for(let L=minL+1;L<top;L++)if(sc[L]>sc[L-1]&&sc[L]>=sc[L+1]&&sc[L]>best){best=sc[L];Lb=L;}
+    if(!Lb||best<=0){this.noLock();return;}
+    // The strongest score can sit on a multiple of the real period (clean periodic signals repeat equally well at 2x, 3x): walk
+    // down to the fundamental, the shortest lag whose score is nearly as good.
+    for(const d of [3,2]){const Ld=Math.round(Lb/d),lo=Math.max(minL+1,Math.round(Ld*0.97)),hi=Math.min(top-1,Math.round(Ld*1.03));let pk=0,pb=0;
+      for(let L=lo;L<=hi;L++)if(sc[L]>sc[L-1]&&sc[L]>=sc[L+1]&&sc[L]>pb){pb=sc[L];pk=L;}
+      if(pk&&pb>=0.9*best){Lb=pk;best=Math.max(best,pb);}}
+    // fine period and the shape of one cycle: epoch folding, best contrast within +-6 % of the coarse period
+    const wts=new Float32Array(n),hl=this.halfLife*this.rate;for(let i=0;i<n;i++)wts[i]=Math.pow(0.5,(n-1-i)/hl);
+    let bestF=null,bestP=Lb/this.rate;
+    for(let k=-6;k<=6;k++){const P=Lb/this.rate*(1+0.01*k),f=this.fold(x,ok,wts,n,P);if(!bestF||f.contrast>bestF.contrast){bestF=f;bestP=P;}}
+    const q1=Math.min(1,Math.max(0,(bestF.contrast-0.15)/0.35)),q2=Math.min(1,Math.max(0,(r[Lb]-0.2)/0.4));
+    this.hist.push(bestP);if(this.hist.length>6)this.hist.shift();
+    const hmin=Math.min(...this.hist),hmax=Math.max(...this.hist),steady=this.hist.length>=3&&hmax/hmin<1.08;
+    this.q=Math.sqrt(q1*q2)*(steady?1:0.6);this.contrast=bestF.contrast;this.r=r[Lb];this.updates++;
+    if(this.q>=0.45){this.okRun++;this.badRun=0;}else if(this.q<0.25){this.badRun++;this.okRun=0;}
+    if(this.okRun>=3)this.locked=true;else if(this.badRun>=3)this.locked=false;
+    if(this.q>=0.10&&steady)this.weakRun++;else this.weakRun=0;this.weak=this.weakRun>=3;                      // a rate worth showing, not yet a rhythm to predict from
+    this.P=this.P&&this.locked?0.6*this.P+0.4*bestP:bestP;
+    const B=this.B,m=bestF.m,sm=new Float32Array(B);let mn=1e30,mx=-1e30,ib=0;
+    for(let b=0;b<B;b++){sm[b]=(m[(b+B-1)%B]+2*m[b]+m[(b+1)%B])/4;if(sm[b]<mn)mn=sm[b];if(sm[b]>mx){mx=sm[b];ib=b;}}
+    const span=mx-mn||1;for(let b=0;b<B;b++)this.tpl[b]=(sm[b]-mn)/span;
+    const ya=sm[(ib+B-1)%B],yb=sm[ib],yc=sm[(ib+1)%B],den=ya-2*yb+yc,dlt=den<0?0.5*(ya-yc)/den:0;
+    this.phi0=((ib+0.5+Math.max(-0.5,Math.min(0.5,dlt)))/B+1)%1;
+    const d=Math.max(0,Math.round(this.dil/bestP*B)),ss=(a,b,z)=>{const t=Math.min(1,Math.max(0,(z-a)/(b-a)));return t*t*(3-2*t);};
+    for(let b=0;b<B;b++){let o=0;for(let k=-d;k<=d;k++)o=Math.max(o,this.tpl[(b+k+B)%B]);this.open[b]=ss(0.2,0.55,o);}
+  }
+  fold(x,ok,wts,n,P){
+    const B=this.B,sum=new Float64Array(B),ws=new Float64Array(B);let W=0,S=0,S2=0;
+    for(let i=0;i<n;i++){if(!ok[i])continue;const t=(this.total-n+i+0.5)/this.rate,b=Math.floor(((t/P)%1)*B),w=wts[i];sum[b]+=w*x[i];ws[b]+=w;W+=w;S+=w*x[i];S2+=w*x[i]*x[i];}
+    const mu=S/W,vt=S2/W-mu*mu,m=new Float32Array(B);let vb=0;
+    for(let b=0;b<B;b++){if(ws[b]>0){m[b]=sum[b]/ws[b];vb+=ws[b]*(m[b]-mu)*(m[b]-mu);}else m[b]=mu;}
+    return {m,contrast:vt>0?vb/W/vt:0};
+  }
+  get bpm(){return this.P?60/this.P:0;}
+  phaseAt(t){const p=t/this.P-this.phi0;return p-Math.floor(p);}                       // 0 = the loudest part of the cycle (S1 for a heart)
+  openAt(t){return this.open[Math.floor(((t/this.P)%1+1)%1*this.B)%this.B];}           // 1 = normally active, 0 = normally quiet
+  nextPeak(t){const p=this.phaseAt(t);return t+(p===0?0:(1-p)*this.P);}               // next time the loudest part comes round
+}
+// RMS of each 10 ms: the loudness curve the heart tracker looks at
+class EnvBuilder{constructor(n){this.n=n;this.s=0;this.c=0;this.bad=false;}
+  push(f,bad,cb){for(let i=0;i<f.length;i++){this.s+=f[i]*f[i];if(bad)this.bad=true;if(++this.c===this.n){cb(Math.sqrt(this.s/this.n),this.bad);this.s=0;this.c=0;this.bad=false;}}}}
+// Quietens the audio where the cycle is normally quiet, only while a lock is held, by at most depthDb, scaled by how sure the lock is.
+class CycleGate{constructor(rate){this.rate=rate;this.g=1;this.kOpen=1-Math.exp(-1/(rate*0.005));this.kClose=1-Math.exp(-1/(rate*0.025));}
+  apply(f,t0,tr,depthDb){const dl=Math.pow(10,-depthDb/20);
+    for(let i=0;i<f.length;i++){let tg=1;if(tr&&tr.locked&&depthDb>0)tg=1-(1-dl)*(1-tr.openAt(t0+i/this.rate))*tr.q;
+      this.g+=(tg-this.g)*(tg>this.g?this.kOpen:this.kClose);f[i]*=this.g;}return f;}}
+class VitalsPR{
+  constructor(){
+    this.envB=new EnvBuilder(80);this.samples=0;
+    this.heart=new CycleTracker({rate:100,minP:0.33,maxP:1.5,win:8,hop:0.25,bins:40,dilate:0.05,smooth:2});     // from the sound's loudness
+    this.lung=new CycleTracker({rate:10,minP:1.5,maxP:8,win:40,hop:1,bins:32,dilate:0.4});             // from the sound's loudness, slow
+    this.heartV=new CycleTracker({rate:100,minP:0.33,maxP:1.5,win:8,hop:0.25,bins:40});                // from the chest motion channel
+    this.chest=new CycleTracker({rate:10,minP:1.5,maxP:8,win:40,hop:1,bins:32});                       // breathing from the chest motion channel
+    this.lp=0;this.acc=0;this.nacc=0;this.accBad=false;this.vAcc=0;this.vN=0;this.vBad=false;
+    this.gateH=new CycleGate(8000);this.gateL=new CycleGate(8000);
+  }
+  audio(f,bad){this.envB.push(f,bad,(e,b)=>this.env(e,b));this.samples+=f.length;}
+  env(e,bad){this.heart.push(e,bad);this.lp+=(e-this.lp)*0.04;this.acc+=this.lp;if(bad)this.accBad=true;
+    if(++this.nacc===10){this.lung.push(this.acc/10,this.accBad);this.acc=0;this.nacc=0;this.accBad=false;}}
+  gap(n){const k=Math.round(n/80);for(let i=0;i<k;i++)this.env(0,true);this.samples+=k*80;}          // lost packets: keep the clock right
+  motion(heartSig,chestSig,bad){this.heartV.push(heartSig,bad);this.vAcc+=chestSig;if(bad)this.vBad=true;
+    if(++this.vN===10){this.chest.push(this.vAcc/10,this.vBad);this.vAcc=0;this.vN=0;this.vBad=false;}}
+  time(){return this.samples/8000;}
+  shape(f,kind,depthDb){const t0=this.time();return kind==='heart'?this.gateH.apply(f,t0,this.heart,depthDb):kind==='lungs'?this.gateL.apply(f,t0,this.lung,depthDb):f;}
+}
+/*PR-END*/
+const PR=new VitalsPR();let gateOn=false,curPreset="heart",recBuf=null,recN=0;
+
+// Low-latency player. The ring logic is one class used two ways: inside an
+// AudioWorklet (own audio thread; browsers only allow it on https/localhost)
+// or a ScriptProcessor (works on the node's plain http page). It keeps the
+// buffer near a small target (~40 ms), nudges its playback rate to follow the
+// node's clock, and jumps forward if it ever falls behind.
+const PLAYER_SRC=`class RingPlayer{
+ constructor(outRate){this.N=16384;this.buf=new Float32Array(this.N);this.w=0;this.r=0;this.step=${AFS}/outRate;this.target=0.040*${AFS};this.play=false;this.vol=0.7;this.level=0;}
+ push(a){for(let i=0;i<a.length;i++){this.buf[this.w%this.N]=a[i];this.w++;}if(this.w-this.r>this.N-256)this.r=this.w-this.target;}
+ pull(out){let lv=this.w-this.r;if(!this.play){if(lv>=this.target)this.play=true;else{out.fill(0);this.level=lv;return;}}
+  if(lv>this.target*3)this.r=this.w-this.target,lv=this.target;            // fell behind: drop the backlog
+  const adj=1+Math.max(-0.02,Math.min(0.02,(lv-this.target)/this.target*0.02));
+  for(let i=0;i<out.length;i++){if(this.w-this.r<2){this.play=false;out.fill(0,i);break;}
+   const i0=Math.floor(this.r),f=this.r-i0,a=this.buf[i0%this.N],b=this.buf[(i0+1)%this.N];out[i]=(a+(b-a)*f)*this.vol;this.r+=this.step*adj;}
+  this.level=this.w-this.r;}
+}`;
+let player=null,playerNode=null,playerPort=null,playerLevel=0,playerPeak=0;
+window.blipAudioDebug=()=>({worklet:!!playerPort,bufferedSamples:playerLevel,outputPeak:playerPeak});
+function startPlayer(){const a=audio();if(player||playerPort)return;
+  if(window.isSecureContext&&a.audioWorklet&&window.AudioWorkletNode&&!/player=sp/.test(location.search)){   // ?player=sp forces the fallback
+    const src=PLAYER_SRC+`;class P extends AudioWorkletProcessor{constructor(){super();this.p=new RingPlayer(sampleRate);this.n=0;this.port.onmessage=e=>{if(e.data.s)this.p.push(e.data.s);if(e.data.v!==undefined)this.p.vol=e.data.v;};}
+     process(i,o){const c=o[0][0];this.p.pull(c);let m=0;for(let k=0;k<c.length;k++)m=Math.max(m,Math.abs(c[k]));this.pk=Math.max(this.pk||0,m);if(++this.n%20===0){this.port.postMessage([this.p.level,this.pk]);this.pk=0;}return true;}};registerProcessor('blip-player',P);`;
+    const url=URL.createObjectURL(new Blob([src],{type:'application/javascript'}));
+    a.audioWorklet.addModule(url).then(()=>{playerNode=new AudioWorkletNode(a,'blip-player');playerNode.connect(a.destination);playerPort=playerNode.port;
+      playerPort.onmessage=e=>{playerLevel=e.data[0];playerPeak=e.data[1];};playerPort.postMessage({v:vol()});}).catch(spPlayer);
+  }else spPlayer();}
+function spPlayer(){const a=audio();const RP=new Function(PLAYER_SRC+';return RingPlayer;')();player=new RP(a.sampleRate);player.vol=vol();
+  playerNode=a.createScriptProcessor(512,0,1);playerNode.onaudioprocess=e=>{const c=e.outputBuffer.getChannelData(0);player.pull(c);playerLevel=player.level;let m=0;for(let k=0;k<c.length;k++)m=Math.max(m,Math.abs(c[k]));playerPeak=m;};playerNode.connect(a.destination);}
+function stopPlayer(){try{playerNode&&playerNode.disconnect();}catch(e){}player=null;playerNode=null;playerPort=null;}
+function vol(){const v=+$('#vol').value/100;return v*v*2;}
+$('#vol').oninput=()=>{if(player)player.vol=vol();if(playerPort)playerPort.postMessage({v:vol()});};
+
+// G.711 mu-law decode table for 'U' audio packets (8 bits per sample)
+const MU=new Float32Array(256);for(let i=0;i<256;i++){const u=~i&255,t=(((u&15)<<3)+0x84)<<((u&0x70)>>4);MU[i]=((u&0x80)?0x84-t:t-0x84)/32768;}
+function gotPacket(buf){if(buf.byteLength<6)return;stRx++;const dv=new DataView(buf),type=dv.getUint8(0),flags=dv.getUint8(1),seq=dv.getUint16(2,true),n=(buf.byteLength-6)>>1;
+  if(flags&1)bumpUntil=Date.now()+400;
+  if(type===0x41||type===0x55){                               // 'A' int16 audio / 'U' mu-law audio
+    const u=type===0x55,cnt=u?buf.byteLength-6:n;
+    let lostNow=0;if(aSeq>=0&&((seq-aSeq)&0xffff)>1){lostNow=(seq-aSeq-1)&0xffff;lost+=lostNow;if(lostNow<200)PR.gap(lostNow*cnt);}aSeq=seq;
+    const f=new Float32Array(cnt);let mn=1,mx=-1;for(let i=0;i<cnt;i++){const v=u?MU[dv.getUint8(6+i)]:dv.getInt16(6+i*2,true)/32768;f[i]=v;if(v<mn)mn=v;if(v>mx)mx=v;}
+    env.push([mn,mx,flags&1]);if(env.length>ENVN)env.shift();
+    if(recBuf){recBuf.push(f.slice());recN+=cnt;if(recN>=AFS*10)finishRec();}
+    let g=f;if(gateOn&&listening&&(curPreset==='heart'||curPreset==='lungs'))g=PR.shape(f.slice(),curPreset,curPreset==='heart'?9:6);
+    $('#agcv').innerHTML=dv.getInt8(4)+'<small> · '+dv.getInt8(5)+' dB</small>';
+    PR.audio(f,(flags&5)!==0);
+    if(listening){if(playerPort)playerPort.postMessage({s:g},[g.buffer]);else if(player)player.push(g);}
+    showRates();
+  }else if(type===0x56){                                      // 'V' chest motion
+    for(let i=0;i<n;i++){let v=dv.getInt16(6+i*2,true)/16384;
+      if(flags&5)v=lastV;else lastV=v;                          // hold through bumps instead of drawing a spike
+      const w=fLp(fHp(v)),hs=fH3(fH2(fH1(v)));vis.push(w);visBump.push(flags&1);if(vis.length>VISN){vis.shift();visBump.shift();}
+      heartBuf.push(hs);if(heartBuf.length>VFS*8)heartBuf.shift();
+      PR.motion(hs,w,(flags&5)!==0);}
+    showRates();thumpCheck();}
+}
+// Heart and breath rates come from the pattern trackers (autocorrelation, then folding the signal on the found period).
+// The heart is taken from the sound when the Heart preset is running, else from the chest motion; breathing from the chest motion first, else from the lung sound.
+let shownBpm='',shownBr='';
+function showRates(){
+  const q=t=>t.locked?2:t.weak?1:0,pickH=q(PR.heart)>=q(PR.heartV)?PR.heart:PR.heartV,pickB=q(PR.chest)>=q(PR.lung)?PR.chest:PR.lung;
+  const f=(t,lim)=>{const k=q(t);return k&&t.bpm<lim?Math.round(t.bpm)+(k===1?' ?':''):'—';};
+  const h=f(pickH,240),b=f(pickB,60);
+  if(h!==shownBpm){shownBpm=h;$('#bpm').innerHTML=h+'<small> bpm</small>';}
+  if(b!==shownBr){shownBr=b;$('#brpm').innerHTML=b+'<small> /min</small>';}}
+// beat thumps: still triggered from the chest-motion peaks
+function thumpCheck(){const N=heartBuf.length;if(N<VFS*2)return;
+  const h=heartBuf[N-1],h1=heartBuf[N-2]||0;let mx=0;for(let i=Math.max(0,N-VFS*2);i<N;i++)mx=Math.max(mx,Math.abs(heartBuf[i]));
+  if(thump&&listening&&h1<h&&h>mx*0.6&&Date.now()-lastBeat>350){lastBeat=Date.now();playThump();}}
+// Record 10 s of what arrives from the node (after its clean-up) to a 16-bit 8 kHz WAV, so it can be looked at with tools/analyze_wav.py
+function finishRec(){const parts=recBuf;recBuf=null;recN=0;const n=parts.reduce((a,p)=>a+p.length,0),pcm=new Int16Array(n);let o=0;
+  for(const p of parts){for(let i=0;i<p.length;i++)pcm[o++]=Math.max(-32768,Math.min(32767,Math.round(p[i]*32767)));}
+  const h=new DataView(new ArrayBuffer(44));const w=(o,t)=>{for(let i=0;i<t.length;i++)h.setUint8(o+i,t.charCodeAt(i));};
+  w(0,'RIFF');h.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');h.setUint32(16,16,true);h.setUint16(20,1,true);h.setUint16(22,1,true);h.setUint32(24,AFS,true);h.setUint32(28,AFS*2,true);h.setUint16(32,2,true);h.setUint16(34,16,true);w(36,'data');h.setUint32(40,n*2,true);
+  const L=(status&&status.lab)||{},name='stetho_'+curPreset+'_os'+(L.os||0)+'_nb'+(L.nb===undefined?1:L.nb)+'_'+new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)+'.wav';
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([h,pcm],{type:'audio/wav'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);
+  const b=$('#rec');b.textContent='⏺ Record 10 s → WAV';b.classList.remove('on');}
+$('#rec').onclick=e=>{if(recBuf)return;recBuf=[];recN=0;e.target.textContent='⏺ Recording…';e.target.classList.add('on');};
+$('#gate').onclick=e=>{gateOn=!gateOn;e.target.textContent='Beat lock: '+(gateOn?'on':'off');e.target.classList.toggle('on',gateOn);};
+function labSet(q){return fetch('/api/lab?'+q).then(r=>r.json()).then(gotStatus).catch(()=>alert('Node did not answer'));}
+$$('#osSeg button').forEach(b=>b.onclick=()=>labSet('os='+b.dataset.os));
+$$('#nbSeg button').forEach(b=>b.onclick=()=>labSet('nb='+b.dataset.nb));
+function playThump(){const a=audio(),o=a.createOscillator(),g=a.createGain(),t=a.currentTime,v=vol()/2;o.type='sine';o.frequency.setValueAtTime(90,t);o.frequency.exponentialRampToValueAtTime(40,t+0.12);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(0.001,0.9*v),t+0.01);g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);o.connect(g).connect(a.destination);o.start(t);o.stop(t+0.2);}
+$('#listen').onclick=e=>{listening=!listening;if(listening)startPlayer();else stopPlayer();e.target.classList.toggle('on',listening);e.target.textContent=listening?'🎧 Listening':'🎧 Listen on phone';};
+$('#thump').onclick=e=>{thump=!thump;e.target.textContent='Beat thumps: '+(thump?'on':'off');e.target.classList.toggle('on',thump);};
+$$('[data-view]').forEach(b=>b.onclick=()=>{$$('[data-view]').forEach(x=>x.classList.remove('on'));b.classList.add('on');view=b.dataset.view;});
+// node-side settings
+$$('#presetSeg button').forEach(b=>b.onclick=()=>cfg('preset='+b.dataset.p));
+$$('#agcSeg button').forEach(b=>b.onclick=()=>cfg('agc='+b.dataset.agc));
+$$('#outSeg button').forEach(b=>b.onclick=()=>{if(!b.disabled)cfg('out='+b.dataset.out);});
+[['ns','ns','nsV','%'],['bumpS','bump','bumpV','%'],['maxg','maxgain','maxgV',' dB'],['gain','gain','gainV',' dB'],['ovol','ovol','ovolV','%']].forEach(([id,key,lab,u])=>{
+  const el=$('#'+id);el.oninput=()=>$('#'+lab).textContent=el.value+u;el.onchange=()=>cfg(key+'='+el.value);});
+// What the node says about the Stetho path, step by step, so "nothing on screen" has a reason.
+let stHint='waiting for Stetho packets…',stRx=0;
+function stDiag(S){const d=$('#stdiag');if(!d||!S)return;let h,cls='';
+  const pin='GPIO'+(S.pinI===undefined?'?':S.pinI),L=S.level||{},V=x=>L.mv?(x/1000).toFixed(2)+' V':x+' (raw 0–4095)';
+  const e=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  if(!S.enabled){h='Stetho is <b>off</b> on the node.<button class="b" id="stOn">Turn it on</button>';cls='warn';stHint='Stetho is off: press "Turn it on" above';}
+  else if(S.asleep){h='Stetho is asleep (Auto-sleep in Settings). It wakes when a phone connects.';stHint='Stetho is asleep';}
+  else if(S.running===false&&!S.err){h='Stetho is starting…';stHint='Stetho is starting…';}
+  else if(S.running===false){h='Stetho is on, but the node could not start it: <b>'+e(S.err)+'</b>.';cls='bad';stHint='the node could not start the ADC';}
+  else if(S.samples===0){h='Stetho is running, but '+pin+' has not given any samples yet.';cls='warn';stHint='no samples from '+pin+' yet';}
+  else if(L.avg===undefined||L.avg<0){h='Stetho is running on '+pin+' · measuring the level…';}
+  else{let tip='';const span=L.max-L.min;
+    if(L.mv&&L.avg>=0){if(L.avg<150)tip='Stuck near 0 V: check the MAX4466 OUT wire, its 3V3 and GND — or the pin may be damaged.';
+      else if(L.avg>2900)tip='Stuck near the top: the MAX4466 must run from 3V3, not 5V — or the pin may be damaged.';
+      else if(span<15)tip='Almost flat: the amp is idling but nothing is coming in. Wave a hand a few cm from the radar, check the IF wire, turn the gain pot up.';}
+    h=pin+' reads <b>'+V(L.avg)+'</b> (range '+V(L.min)+' – '+V(L.max)+') · '+(S.sent||0)+' packets sent'+(S.skipped?' · '+S.skipped+' skipped (slow Wi-Fi)':'')+(S.dropped?' · '+S.dropped+' dropped':'')+(tip?'<br>'+tip:'');cls=tip?'warn':'';
+    if(!tip&&S.skipped>50&&S.skipped>S.sent/20)h+='<br>Wi-Fi can\'t keep up, so audio is skipped rather than delayed. Move closer, or on a Linux laptop turn Wi-Fi power saving off: <code>sudo iw dev wlan0 set power_save off</code>';
+    stHint=S.sent&&!stRx?'the node has sent packets but this page got none: reload the page':'node is sampling; waiting for the first packet…';}
+  const N=status&&status.node,age=(Date.now()-statusAt)/1000;
+  if(!sim&&statusAt&&age>5){h='<b>No update from the node for '+Math.round(age)+' s.</b> It may have crashed and restarted, or the Wi-Fi dropped. This page has reconnected '+Math.max(0,wsOpens-1)+' time(s) so far. When it answers again, <a class="loglink" onclick="openLog()">open the node log</a> to see what happened. Last reading: '+h;cls='bad';}
+  if(N&&N.heap!==undefined&&!sim)h+='<br><span class="muted">Node: '+Math.round(N.heap/1024)+' KB free (lowest '+Math.round(N.heapMin/1024)+' KB) · slowest loop '+N.loopMs+' ms · up '+(N.up<120?N.up+' s':Math.floor(N.up/60)+' min')+' · start #'+N.boots+', last reset: '+N.reset+'</span>';
+  d.className='diag '+cls;d.innerHTML=h;const b=$('#stOn');if(b)b.onclick=()=>cfg('stetho=1');}
+function stethoUi(S){if(!S||S.preset===undefined)return;
+  if(S.preset!==curPreset){curPreset=S.preset;}
+  const L=(status&&status.lab)||{};$$('#osSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.os===(L.os||0)));$$('#nbSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.nb===(L.nb===undefined?1:L.nb)));
+  $$('#presetSeg button').forEach(b=>b.classList.toggle('on',b.dataset.p===S.preset));
+  $$('#agcSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.agc==='1')===!!S.agc));$('#maxgF').hidden=!S.agc;$('#gainF').hidden=!!S.agc;
+  const set=(id,lab,v,u)=>{if(document.activeElement!==$('#'+id)){$('#'+id).value=v;$('#'+lab).textContent=v+u;}};
+  set('ns','nsV',S.ns,'%');set('bumpS','bumpV',S.bump,'%');set('maxg','maxgV',S.maxgain,' dB');set('gain','gainV',S.gain,' dB');set('ovol','ovolV',S.ovol,'%');
+  const outs=S.outs||{};$$('#outSeg button').forEach(b=>{const o=+b.dataset.out;b.disabled=(o===1&&!outs.earphone)||(o===2&&!outs.amp);b.classList.toggle('on',o===S.out);});}
+function drawStrip(){sx.clearRect(0,0,SW,SH);sx.strokeStyle='#1b3a26';sx.beginPath();sx.moveTo(0,SH/2);sx.lineTo(SW,SH/2);sx.stroke();
+  sx.font='11px system-ui';sx.textAlign='left';
+  if(view==='audio'&&env.length>1){const n=env.length,colW=SW/ENVN;let mx=0.02;for(const e of env)mx=Math.max(mx,-e[0],e[1]);
+    for(let i=0;i<n;i++){const e=env[i],x=SW-(n-i)*colW;sx.fillStyle=e[2]?'#ff5c5c':'#39ff8a';const y0=SH/2-e[1]/mx*(SH/2-8),y1=SH/2-e[0]/mx*(SH/2-8);sx.fillRect(x,y0,Math.max(1,colW),Math.max(1,y1-y0));}
+    sx.fillStyle='#7fb597';sx.fillText('8 s · sound after clean-up (red = bump ducked)',6,12);}
+  else if(view==='vitals'&&vis.length>1){sx.strokeStyle='#5ad0ff';sx.lineWidth=1.5;sx.beginPath();let mx=0.002;for(const v of vis)mx=Math.max(mx,Math.abs(v));
+    const step=SW/VISN,off=VISN-vis.length;for(let i=0;i<vis.length;i++){const x=(off+i)*step,y=SH/2-vis[i]/mx*(SH/2-8);i?sx.lineTo(x,y):sx.moveTo(x,y);}sx.stroke();
+    sx.fillStyle='#ff5c5c';for(let i=0;i<visBump.length;i++)if(visBump[i])sx.fillRect((off+i)*step,SH-4,step+1,4);
+    sx.fillStyle='#7fb597';sx.fillText('8 s · chest motion 0.1–5 Hz (breathing, heartbeat)',6,12);}
+  else{sx.fillStyle='#7fb597';sx.font='13px system-ui';sx.textAlign='center';sx.fillText(stHint,SW/2,SH/2-8);}
+  $('#bumpInd').textContent=Date.now()<bumpUntil?'⚡ bump ducked':'';
+  $('#lat').innerHTML=listening?(Math.round(playerLevel/AFS*1000+(audio().baseLatency||0)*1000+16)+'<small> ms'+(lost?' · '+lost+' lost':'')+'</small>'):'—<small> ms</small>';
+  requestAnimationFrame(drawStrip);}
+requestAnimationFrame(drawStrip);
+})();
+</script>
+</body>
+</html>
