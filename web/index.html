@@ -90,12 +90,13 @@ pre{background:#071a0f;border:1px solid var(--line);border-radius:8px;padding:8p
     <div class="card"><div class="k">Nearest</div><div class="v" id="nD">—<small> m</small></div></div>
     <div class="card"><div class="k">Speed</div><div class="v" id="nV">—<small> cm/s</small></div></div>
   </div>
-  <div class="row"><div class="seg modeSeg"><button data-mode="single">Track 1 (nearest)</button><button data-mode="multi">Track 3</button></div></div>
+  <div class="row"><div class="seg modeSeg"><button data-mode="single">Track 1 (nearest)</button><button data-mode="multi">Track 3</button></div>
+    <div class="seg handSeg" title="Carrying the radar? Hides fixed things you walk past (lamp posts, parked cars). Experimental."><button data-hand="0">Standing</button><button data-hand="1">🚶 Handheld</button></div></div>
   <div class="row">
     <button class="b" id="beep">🔈 Tracker ping: off</button>
     <button class="b" id="trail">Trails: on</button>
     <button class="b" id="flip">Mirror L/R</button>
-    <button class="b" id="showH" hidden>Show filtered</button>
+    <button class="b" id="showH">Show filtered</button>
   </div>
   <p class="muted">Sector is ±60° azimuth, rings every 2 m to 8 m. The RD-03D only reports <b>moving</b> people; someone standing dead still fades out. Tracker ping speeds up and rises in pitch as the nearest person approaches.</p>
 </section>
@@ -157,6 +158,20 @@ pre{background:#071a0f;border:1px solid var(--line);border-radius:8px;padding:8p
     <div class="seg" id="filtSeg"><button data-f="raw">Raw (module)</button><button data-f="smart">Smart (experimental)</button></div></div>
   <p class="muted" id="filtMsg">Smart: Blip's own tracker on top of the module — stable ids, smoothing, hides one-frame flickers, wall reflections and things that wobble in place (fans, curtains). Use <b>Show filtered</b> on the Scope to see what it hides.</p>
   <div class="row"><button class="b" id="forget">Forget learned clutter</button></div>
+  <div class="field"><label>Ignore anything closer than</label>
+    <select id="minrSel"><option value="10">0.1 m (off)</option><option value="30">0.3 m</option><option value="50">0.5 m (the module's blind zone)</option><option value="80">0.8 m</option><option value="100">1.0 m</option></select></div>
+  <div class="field"><label>Ignore the edges of the view beyond</label>
+    <select id="edgeSel"><option value="65">±65° (off)</option><option value="50">±50°</option><option value="40">±40°</option><option value="30">±30°</option></select></div>
+  <div class="field"><label>Drop a target frozen on exactly the same spot after</label>
+    <select id="stuckSel"><option value="0">never (off)</option><option value="5">5 s</option><option value="10">10 s</option><option value="30">30 s</option><option value="60">60 s</option></select></div>
+  <p class="muted">The LD2450 (and sometimes the RD-03D) can lock onto a phantom (a fan, glass, a reflection) and keep reporting it at identical coordinates after everything has gone. A real person always wobbles a few millimetres, so a target that hasn't moved by even 1 mm is dropped. It comes back the moment it moves.</p>
+  <div class="field"><label>Handheld mode (radar being carried)</label>
+    <div class="seg handSeg"><button data-hand="0">Off</button><button data-hand="1">On (experimental)</button></div></div>
+  <p class="muted">Handheld: while you walk, Blip works out your walking speed from the contacts and hides the ones that close in at exactly that speed, which is what fixed things (lamp posts, parked cars, walls) do. People moving on their own stay. It also stops the Smart filter learning clutter, which means nothing on a moving radar. Not tested on a real walk yet.</p>
+  <div class="row"><button class="b" id="simWalk" hidden>🧪 Simulator: carry the radar down a street</button></div>
+  <div class="field" id="sghostF"><label>Strict ghost test (Smart filter)</label>
+    <div class="seg" id="sghostSeg"><button data-sg="0">Off</button><button data-sg="1">On (experimental)</button></div></div>
+  <p class="muted" id="sghostMsg">Also hides a contact whose range has moved in step with a nearer one for 3 s, at any bearing (reflections off side walls, cars). Can now and then hide a second person who walks exactly like the first.</p>
   <div class="field"><label>Auto-sleep when nobody is watching or listening</label>
     <select id="sleepSel"><option value="0">Never</option><option value="2">2 min</option><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option></select></div>
   <div class="field"><label>OLED display on the node</label>
@@ -241,12 +256,13 @@ function gotStatus(j){status=j;statusAt=Date.now();sim=!!j.sim;if(j.flash)loadFl
   const S=j.stetho||{},st=!!S.enabled;$$('#stSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.st==='1')===st));
   $('#stmsg').textContent=st?('Stetho: '+(S.rate||8000)+' Hz from GPIO'+S.pinI+', '+(S.frame||128)+'-sample packets'+(S.dropped?(', '+S.dropped+' packets dropped on the node'):'')+'.'):'Stetho channel is off. Enable it in Settings once the module and MAX4466 board are wired to the ADC pin (see hardware/max4466-mod.md).';
   stethoUi(S);stDiag(S);
-  const R=j.radar||{};$$('#filtSeg button').forEach(b=>b.classList.toggle('on',b.dataset.f===(R.filter||'raw')));$('#showH').hidden=R.filter!=='smart';$('#forget').hidden=R.filter!=='smart';
+  const R=j.radar||{};$$('#filtSeg button').forEach(b=>b.classList.toggle('on',b.dataset.f===(R.filter||'raw')));$('#forget').hidden=R.filter!=='smart';$('#sghostF').hidden=$('#sghostMsg').hidden=R.filter!=='smart';
+  $('#simWalk').hidden=!j.sim;$('#simWalk').classList.toggle('on',!!R.simwalk);$('#simWalk').textContent=R.simwalk?'🧪 Simulator: street walk on (press to stop)':'🧪 Simulator: carry the radar down a street';$('#minrSel').value=String(R.minr||10);$('#stuckSel').value=String(R.stuck==null?10:R.stuck);$('#edgeSel').value=String(R.edge||65);$$('.handSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.hand==='1')===!!R.hand));$$('#sghostSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.sg==='1')===!!R.sghost));
   $('#sleepSel').value=String(j.sleepMin||0);$$('#txpSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.txp===j.txp));$('#roffF').hidden=!(R.pwrPin>=0);$$('#roffSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.roff==='1')===!!R.offWhileListening));
   setConn(sim?'simulator':(ws&&ws.readyState===1?'live':'polling'),true);
 }
-function gotTargets(j){lastMsg=Date.now();alive=!!j.alive;targets=j.t||[];hidden=j.h||[];filterMode=j.f||'raw';
-  $('#fps').textContent=j.sleep?'radar asleep':alive?('radar '+(j.fps||0)+' fps'+(filterMode==='smart'?' · smart':'')):'no radar data';
+function gotTargets(j){lastMsg=Date.now();alive=!!j.alive;targets=j.t||[];hidden=(j.h||[]).concat(j.g||[]);filterMode=j.f||'raw';
+  $('#fps').textContent=j.sleep?'radar asleep':alive?('radar '+(j.fps||0)+' fps'+(filterMode==='smart'?' · smart':'')+(j.ego!=null?(' · '+(j.ego?('walking '+(j.ego/1000).toFixed(1)+' m/s'):'handheld')):'')):'no radar data';
   if(!alive)$('#dot').classList.remove('ok');else if(!$('#dot').classList.contains('ok'))$('#dot').classList.add('ok');
   updateCards();updateTable();}
 connect();fetchStatus();
@@ -262,6 +278,12 @@ $$('#stSeg button').forEach(b=>b.onclick=()=>cfg('stetho='+b.dataset.st));
 $$('#roffSeg button').forEach(b=>b.onclick=()=>cfg('radarOff='+b.dataset.roff));
 $$('#filtSeg button').forEach(b=>b.onclick=()=>cfg('filter='+b.dataset.f));
 $('#forget').onclick=()=>cfg('forget=1');
+$('#minrSel').onchange=e=>cfg('minr='+e.target.value);
+$('#edgeSel').onchange=e=>cfg('edge='+e.target.value);
+$('#stuckSel').onchange=e=>cfg('stuck='+e.target.value);
+$$('.handSeg button').forEach(b=>b.onclick=()=>cfg('hand='+b.dataset.hand));
+$$('#sghostSeg button').forEach(b=>b.onclick=()=>cfg('sghost='+b.dataset.sg));
+$('#simWalk').onclick=()=>cfg('simwalk='+(status&&status.radar&&status.radar.simwalk?0:1));
 $('#sleepSel').onchange=e=>cfg('sleep='+e.target.value);
 $$('#txpSeg button').forEach(b=>b.onclick=()=>cfg('txp='+b.dataset.txp));
 let logText='';
@@ -288,12 +310,18 @@ const col=id=>COL[(id-1)%3];
 function sizeScope(){if(!sc.clientWidth)return;   // hidden tab (width 0): keep the last size, or the arcs below get negative radii
   dpr=window.devicePixelRatio||1;W=sc.clientWidth;H=Math.round(W*0.62);sc.width=W*dpr;sc.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
 window.addEventListener('resize',sizeScope);sizeScope();
-function toPx(x,y){const cx=W/2,cy=H-6,R=Math.min(W/2-8,H-14);const sx=(mirror?1:-1)*x/RANGE*R,sy=y/RANGE*R;return[cx+sx,cy-sy,R,cx,cy];}
+function toPx(x,y){const cx=W/2,cy=H-6,R=Math.min(W/2-8,H-14);const sx=(mirror?-1:1)*x/RANGE*R,sy=y/RANGE*R;return[cx+sx,cy-sy,R,cx,cy];}
 function drawScope(){
   if(W<40)return;
   const [,,R,cx,cy]=toPx(0,0);ctx.clearRect(0,0,W,H);
   ctx.strokeStyle='#1f6b3f';ctx.lineWidth=1;ctx.fillStyle='#7fb597';ctx.font='11px system-ui';ctx.textAlign='center';
-  for(let i=1;i<=4;i++){const r=R*i/4;ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2-Math.PI/3,-Math.PI/2+Math.PI/3);ctx.stroke();ctx.fillText((i*2)+' m',cx+r*Math.sin(Math.PI/3)+16,cy-r*Math.cos(Math.PI/3)+4);}
+  // a ring every metre: solid + "2 m" at even metres, faint dashed + small "1" at odd ones
+  for(let m=1;m<=8;m++){const r=R*m/8,even=m%2===0;
+    ctx.strokeStyle=even?'#1f6b3f':'#163f28';ctx.setLineDash(even?[]:[3,4]);
+    ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2-Math.PI/3,-Math.PI/2+Math.PI/3);ctx.stroke();
+    ctx.fillStyle=even?'#7fb597':'#4f7f63';ctx.font=even?'11px system-ui':'10px system-ui';
+    ctx.fillText(even?m+' m':String(m),cx+r*Math.sin(Math.PI/3)+(even?16:9),cy-r*Math.cos(Math.PI/3)+4);}
+  ctx.setLineDash([]);ctx.strokeStyle='#1f6b3f';ctx.fillStyle='#7fb597';ctx.font='11px system-ui';
   for(let a=-60;a<=60;a+=30){const t=a*Math.PI/180;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.sin(t),cy-R*Math.cos(t));ctx.stroke();}
   ctx.fillText('L',cx-R*Math.sin(Math.PI/3)-12,cy-R*Math.cos(Math.PI/3)-6);ctx.fillText('R',cx+R*Math.sin(Math.PI/3)+12,cy-R*Math.cos(Math.PI/3)-6);
   // sweep
@@ -309,7 +337,13 @@ function drawScope(){
     ctx.fillStyle=col;ctx.shadowColor=col;ctx.shadowBlur=14;ctx.beginPath();ctx.arc(px,py,7,0,7);ctx.fill();ctx.shadowBlur=0;
     // velocity arrow along the line of sight (radial speed)
     const ang=Math.atan2(px-cx,cy-py),len=Math.max(-40,Math.min(40,t.v*0.6));ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(px+len*Math.sin(ang),py-len*Math.cos(ang));ctx.stroke();
-    ctx.fillStyle='#d9f5e3';ctx.textAlign='left';ctx.font='12px system-ui';ctx.fillText(t.id+'  '+(t.d/1000).toFixed(1)+' m  '+(t.v>0?'+':'')+t.v,px+10,py-8);});
+    ctx.textAlign='left';const dl=(t.d/1000).toFixed(1)+' m';
+    // two lines: distance (bold, with units), then speed and the track number, which is only an ID
+    const sp=(t.v===0?'still':(t.v>0?'away ':'closer ')+Math.abs(t.v)+' cm/s')+' · #'+t.id;
+    ctx.font='11px system-ui';const w=Math.max(ctx.measureText(sp).width,40);
+    const lx=px+10+w>W-4?Math.max(2,px-10-w):px+10;      // near the right edge, put it left of the dot
+    ctx.fillStyle='#d9f5e3';ctx.font='bold 13px system-ui';ctx.fillText(dl,lx,py-10);
+    ctx.fillStyle='#7fb597';ctx.font='11px system-ui';ctx.fillText(sp,lx,py+3);});
   if(stale||!alive){ctx.fillStyle='rgba(6,18,11,.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#ffb347';ctx.font='15px system-ui';ctx.textAlign='center';ctx.fillText(stale?'no data from node':'radar not sending — check 5 V and TX/RX',cx,H/2);}
   requestAnimationFrame(drawScope);}
 requestAnimationFrame(drawScope);

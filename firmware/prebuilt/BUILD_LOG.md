@@ -4,6 +4,81 @@
 The git history keeps the binaries of the **last 3 builds** only (see PUBLISHING.md); older builds are listed
 here so they stay identifiable by version, time and SHA-256.
 
+## 0.2.2-wip — built 2026-11-14 11:09
+
+What changed: Fix: left/right was mirrored for both radars; new frozen-target filter (default 10 s)
+
+Source hash: `691a1784c28451a8072757a16f56696783e541540e18f28e618706379c30ac6b`
+
+| Build | File | Bytes | SHA-256 |
+|---|---|---|---|
+| `c3-supermini` | blip-c3-supermini-full.bin | 1333696 | `182006e257f281b687ec947edde8ece352b695ac40c333edcabb9474cf2ab302` |
+| `s3-pico` | blip-s3-pico-full.bin | 1209584 | `608b71ca72c3590cfa6826ca92dc8311a69a39f25ac345eb070227a49c85a5f7` |
+| `c3-supermini-ld2450` | blip-c3-supermini-ld2450-full.bin | 1333664 | `10ed7be1a453fcf962450e203f6dcbc4b135c570673e763bc9a72882442778f5` |
+| `s3-pico-ld2450` | blip-s3-pico-ld2450-full.bin | 1209552 | `2fe13a4d869306c9abd0fede916883f34f84a566649a3d7ab5cda52950c2826f` |
+| `c3-supermini-bench` | blip-c3-supermini-bench-full.bin | 1261728 | `36f05f72ff164d9d355d1e2f215e89e9fb7cf5327255f8c981947fce6b7b200d` |
+| `s3-pico-bench` | blip-s3-pico-bench-full.bin | 1144240 | `74d5c1bc3fd9984f02ae5300ea1592bc05b230ea7f93f2680d3e379c9e765b4a` |
+
+## 0.2.2-wip — built 2026-11-13 21:12
+
+What changed: Metre rings on the scope; two-line target labels
+
+Source hash: `6bbfaa353905ea3dbfb1fec7be94557251a256c92af3f08463b1849c96e9f09d`
+
+| Build | File | Bytes | SHA-256 |
+|---|---|---|---|
+| `c3-supermini` | blip-c3-supermini-full.bin | 1332688 | `3af5686dca9ccdd75af86752b70b67ed0101b41726fa9f7518464256a62f4c79` |
+| `s3-pico` | blip-s3-pico-full.bin | 1208768 | `cea46d304aabb8a67a01ff4ef83364592dd3b0cca611b2989ab7a11b5576c6be` |
+| `c3-supermini-ld2450` | blip-c3-supermini-ld2450-full.bin | 1332656 | `609d198b26c6d9c3a88eec6decad37e5ee540c62c06507eed40eaa1a4909ae68` |
+| `s3-pico-ld2450` | blip-s3-pico-ld2450-full.bin | 1208736 | `8b651d4a33cf12bce0655713f81791696c1b763d3d4f762b0e75bfe66442a771` |
+| `c3-supermini-bench` | blip-c3-supermini-bench-full.bin | 1261728 | `36f05f72ff164d9d355d1e2f215e89e9fb7cf5327255f8c981947fce6b7b200d` |
+| `s3-pico-bench` | blip-s3-pico-bench-full.bin | 1144240 | `74d5c1bc3fd9984f02ae5300ea1592bc05b230ea7f93f2680d3e379c9e765b4a` |
+
+## 0.2.2-wip — built 2026-11-13 21:10
+
+What changed: Scope labels: distance first, then closer/away speed, track number marked # (was read as a distance)
+
+Source hash: `f19cc7d46c0fea6709753128c1238f91d7ead62fa566000f0b9333b932c367ef`
+
+| Build | File | Bytes | SHA-256 |
+|---|---|---|---|
+| `c3-supermini` | blip-c3-supermini-full.bin | 1332528 | `079cb83e0fe11b9d955d425bfbc240a3dba397f9b9d50c6ba97697bcee5cbcf9` |
+| `s3-pico` | blip-s3-pico-full.bin | 1208608 | `d275292b0e9c1ee65031f5560ef156f3f2cf8eb94327871a2d5a8aeb6cf4ace3` |
+| `c3-supermini-ld2450` | blip-c3-supermini-ld2450-full.bin | 1332496 | `f6dbaad68fad52d04992b60269056bf01ecd8da27c0174fc831ecc791f158997` |
+| `s3-pico-ld2450` | blip-s3-pico-ld2450-full.bin | 1208576 | `2fc12df9d7cda516f32b8c37b7c6dd08d53d6fed5ae1c0d4377205a3f536936b` |
+| `c3-supermini-bench` | blip-c3-supermini-bench-full.bin | 1261728 | `36f05f72ff164d9d355d1e2f215e89e9fb7cf5327255f8c981947fce6b7b200d` |
+| `s3-pico-bench` | blip-s3-pico-bench-full.bin | 1144240 | `74d5c1bc3fd9984f02ae5300ea1592bc05b230ea7f93f2680d3e379c9e765b4a` |
+
+## 0.2.2-wip — built 2026-11-13 20:53
+
+What changed: 2 MB flash layout for all boards (S3 build was 16 MB and boot-looped on 4 MB S3 boards); S3 log also on native USB
+
+Source hash: `a6259a769297dc502051e2670c6c87ae524b7a356827a141f90484c642ef1a04`
+
+| Build | File | Bytes | SHA-256 |
+|---|---|---|---|
+| `c3-supermini` | blip-c3-supermini-full.bin | 1332336 | `3c258beb85862a40250eac78adf723e4ab2ef7315f9f3f51e02ca762b69bf171` |
+| `s3-pico` | blip-s3-pico-full.bin | 1208416 | `0b577e710fbbc1d8478e0f97176113803e2df773aedfee0559a564baee3055ec` |
+| `c3-supermini-ld2450` | blip-c3-supermini-ld2450-full.bin | 1332304 | `90478568d50a4dfd5f2d80fa86daafba763ffccd241dc626d752584bbb75a3dc` |
+| `s3-pico-ld2450` | blip-s3-pico-ld2450-full.bin | 1208384 | `0f3382c8651d51e551149b7a48756f2252ce51e278e9ea5c3e65a5f6b470a367` |
+| `c3-supermini-bench` | blip-c3-supermini-bench-full.bin | 1261728 | `36f05f72ff164d9d355d1e2f215e89e9fb7cf5327255f8c981947fce6b7b200d` |
+| `s3-pico-bench` | blip-s3-pico-bench-full.bin | 1144240 | `74d5c1bc3fd9984f02ae5300ea1592bc05b230ea7f93f2680d3e379c9e765b4a` |
+
+## 0.2.2-wip — built 2026-11-13 14:34
+
+What changed: Clutter options: minimum range, edge limit, handheld mode, strict ghost test; Show filtered covers them
+
+Source hash: `9626a8a0c65aefa5d31529530db2326fb9e1a184f688cd6d3ab359606ed275b8`
+
+| Build | File | Bytes | SHA-256 |
+|---|---|---|---|
+| `c3-supermini` | blip-c3-supermini-full.bin | 1332336 | `5ce8c6f2d61a1bb9cc28c4ef98ae5f12a43cbac1b9bf8655e90045e61cfd5d50` |
+| `s3-pico` | blip-s3-pico-full.bin | 1203088 | `88f8380604594f376ca62edbb20bbdca20b4e1c9d42dcdaefbe87eb8f3f79df0` |
+| `c3-supermini-ld2450` | blip-c3-supermini-ld2450-full.bin | 1332304 | `3c493d286fa150a216afd33c2145f2f777a61c7c52ea4c5434be9f88ede93e0a` |
+| `s3-pico-ld2450` | blip-s3-pico-ld2450-full.bin | 1203056 | `fc84263b05936de1cd5bbf8893754b93e0e534a7f105ceb5691542b221aa8d1d` |
+| `c3-supermini-bench` | blip-c3-supermini-bench-full.bin | 1261728 | `58cb57953e5f4c3d27f99c909b451dac9dd38c9c24090fe1e74be00ef560aae7` |
+| `s3-pico-bench` | blip-s3-pico-bench-full.bin | 1120288 | `347562fb60936e78fd50856872662ce7bf8528fe1c4c615abb49c5c6d1084c81` |
+
 ## 0.2.2-wip — built 2026-11-13 00:26
 
 What changed: OLED auto-scan at boot (0x3C/0x3D); Track 1/3 switch on the Radar page

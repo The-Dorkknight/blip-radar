@@ -176,8 +176,8 @@ inline void render(Canvas& c, int height, const Blip* b, int n, const Status& st
   for (int pass = 0; pass < 2; pass++) for (int k = 0; k < m; k++) {
     int i = order[k];
     if ((pass == 1) != (i == nearest)) continue;
-    // module: +x is to the radar's left, so it goes to the screen's left
-    int px = cx - (int)lroundf(b[i].x_mm / RANGE_MM * Rx);
+    // module: +x is to the radar's right (RD-03D and LD2450 alike, seen from behind the radar), so screen right
+    int px = cx + (int)lroundf(b[i].x_mm / RANGE_MM * Rx);
     int py = cy - (int)lroundf(b[i].y_mm / RANGE_MM * Ry);
     if (px < r) px = r;
     if (px > W - 1 - r) px = W - 1 - r;

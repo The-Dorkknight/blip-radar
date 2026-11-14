@@ -38,7 +38,8 @@ static const uint8_t CMD_MULTI_TARGET[12]  = {0xFD,0xFC,0xFB,0xFA,0x02,0x00,0x90
 
 struct Target {
   bool     present;
-  int16_t  x_mm;      // + = left of the radar (Ai-Thinker convention), - = right
+  int16_t  x_mm;      // + = right of the radar, - = left (standing behind it, looking where it looks;
+                      //   ESPHome's rd03d and ld2450 docs agree). Blip had this backwards until 2026-11-14.
   int16_t  y_mm;      // + = in front of the radar
   int16_t  v_cms;     // + = moving away, - = approaching (sign as the module reports it)
   uint16_t res_mm;    // distance gate resolution reported by the module

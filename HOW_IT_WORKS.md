@@ -6,7 +6,7 @@ Plain-English tour, then the protocol details.
 
 - **Reads:** bytes from the RD-03D's TX pin (UART1, 256000 baud). Optionally one ADC pin (the Stetho channel, 8 kHz).
 - **Writes to the radar:** a three-command sequence at boot and whenever you change mode, 200 ms apart: *enable configuration* (`FD FC FB FA 04 00 FF 00 01 00 04 03 02 01`), *single-target* (`FD FC FB FA 02 00 80 00 04 03 02 01`) or *multi-target* (`… 90 00 …`), then *end configuration* (`FD FC FB FA 02 00 FE 00 04 03 02 01`). v0.2.0 and earlier sent the mode command alone, which the module probably ignored. Nothing else is written; the radar's other settings are never altered.
-- **Stores:** a handful of settings in the ESP32's NVS flash: mode, target filter, auto-sleep time, OLED size, Stetho on/off and its clean-up/output settings, hotspot name and password. The Smart filter's clutter map lives in RAM only and is forgotten at power-off.
+- **Stores:** a handful of settings in the ESP32's NVS flash: mode, target filter, auto-sleep time, OLED size, the clutter options (minimum range, edge limit, handheld, strict ghost test), Stetho on/off and its clean-up/output settings, hotspot name and password. The Smart filter's clutter map lives in RAM only and is forgotten at power-off.
 - **Never does:** connect to the internet, join your home Wi-Fi, record or log positions or audio, or send anything to anyone but the phone that joined its hotspot.
 
 ## The pieces
@@ -59,7 +59,7 @@ Targets (WebSocket text frame or `GET /api/targets`):
  "h":[{"id":9,"x":-1100,"y":3000,"why":"ghost"}]}
 ```
 
-`f` is the target filter. With `raw`, `t` is the module's three slots as they come (`id` 1–3 = slot number). With `smart`, `t` holds Blip's own confirmed tracks: `id` is a track number that stays with a person, and `res` is 0. `h` lists what the Smart filter is hiding and why (`ghost` = likely reflection, `clutter` = wobbling in place); the phone draws these as dashed rings when *Show filtered* is on.
+`f` is the target filter. With `raw`, `t` is the module's three slots as they come (`id` 1–3 = slot number). With `smart`, `t` holds Blip's own confirmed tracks: `id` is a track number that stays with a person, and `res` is 0. `h` lists what the Smart filter is hiding and why (`ghost` = likely reflection, `clutter` = wobbling in place); the phone draws these as dashed rings when *Show filtered* is on. `g` (any mode) lists what the clutter options dropped before that (`near`, `edge`, `scenery`), and `ego` is the estimated walking speed in mm/s while handheld mode is on.
 
 `d` is mm, `a` is degrees (+ left). `alive` turns false 1.5 s after the last good frame.
 
@@ -82,6 +82,10 @@ The phone:
 - **Sound:** a ring-buffer player keeps about 40 ms queued, follows the node's clock and skips ahead if it ever lags. It uses an AudioWorklet on https/localhost and a ScriptProcessor on the node's plain-http page. Add `?player=sp` to the URL to force the fallback.
 - **Chest motion:** 0.1–5 Hz for the drawn trace and the breathing estimate (zero-crossings over 8 s), 0.8–3 Hz for the heart rate (first autocorrelation peak between 0.33 and 1.5 s lag). Samples flagged as bumps are held instead of drawn as spikes.
 - The node also plays the same processed audio to 3.5 mm earphones (I2S PDM delta-sigma) or an I2S amp board, with or without a phone (hardware/audio-out.md).
+
+## Clutter options (gate, experimental)
+
+`firmware/include/gate.h` runs on every frame before Raw or Smart: drop contacts closer than the set minimum range or beyond the set edge angle; in handheld mode, turn each remaining contact's closing speed into a guess at our own walking speed (closing speed / cos bearing), take the guess at least two contacts agree on, hold it 1.5 s, and drop every contact that fits it. `tools/gate_py.py` is the simulator's copy; `tests/test_gate_py.py` checks the two agree.
 
 ## Smart target filter (experimental)
 

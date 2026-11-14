@@ -167,6 +167,55 @@ int main(int argc, char** argv) {
     printf("INFO  known limitation: second of two people walking in single file, in step, shown %d of %d frames (looks exactly like a reflection)\n", bVis, frames);
   }
 
+  // ---- 7) strict ghost test: a reflection off a side wall (different bearing) --------
+  // The ghost is 1.3 m farther and 25° to the side, but its range moves in step with A.
+  for (int strict = 0; strict < 2; strict++) {
+    Tracker T; T.cfg.strictGhost = strict; int gVis = 0, aVis = 0, frames = 0;
+    for (int k = 0; k < 20 * 40; k++) {
+      double t = k * DT, ay = 2500 + 1200 * sin(0.4 * t), v = 480 * cos(0.4 * t);
+      double gr = ay + 1300, ga = 25 * M_PI / 180;
+      std::vector<Det> d = {noisy(0, ay, v)};
+      if (k % 10 < 8) d.push_back(noisy(gr * sin(ga), gr * cos(ga), v * (0.8 + 0.1 * frand())));
+      T.update(frameOf(d), DT);
+      auto m = vis(T);
+      if (k > 100) {
+        frames++;
+        bool g = false, a = false;
+        for (auto& kv : m) { if (hypot(kv.second.first - gr * sin(ga), kv.second.second - gr * cos(ga)) < 700) g = true;
+                             if (hypot(kv.second.first, kv.second.second - ay) < 700) a = true; }
+        gVis += g; aVis += a;
+      }
+    }
+    if (!strict) printf("INFO  default ghost test: side-wall reflection shown %d of %d frames (bearing differs, so it is missed)\n", gVis, frames);
+    else {
+      CHECK(gVis * 5 < frames, "strict ghost test hides a side-wall reflection that moves in step (shown %d of %d)", gVis, frames);
+      CHECK(aVis * 100 > frames * 95, "...and the real person stays shown (%d of %d)", aVis, frames);
+    }
+  }
+  // strict test must not eat a real second person who moves independently
+  {
+    Tracker T; T.cfg.strictGhost = true; int bVis = 0, frames = 0;
+    for (int k = 0; k < 20 * 30; k++) {
+      double t = k * DT;
+      double ay = 2000 + 1000 * sin(0.5 * t), avy = 500 * cos(0.5 * t);
+      double bx = 1500, by = 4500 + 800 * sin(0.9 * t + 2), bvy = 720 * cos(0.9 * t + 2);
+      T.update(frameOf({noisy(0, ay, avy), noisy(bx, by, bvy)}), DT);
+      auto m = vis(T);
+      if (k > 60) { frames++; for (auto& kv : m) if (hypot(kv.second.first - bx, kv.second.second - by) < 700) { bVis++; break; } }
+    }
+    CHECK(bVis * 10 > frames * 9, "strict ghost test leaves an independent second person shown (%d of %d)", bVis, frames);
+  }
+
+  // ---- 8) noClutter (handheld): the clutter map is neither learned nor applied ----
+  {
+    Tracker T; T.cfg.noClutter = true; int fanVisLate = 0, late = 0;
+    for (int k = 0; k < 20 * 45; k++) {
+      T.update(frameOf({noisy(-1500, 6000, 15 * frand())}), DT);
+      if (k > 20 * 35) { late++; if (!vis(T).empty()) fanVisLate++; }
+    }
+    CHECK(fanVisLate * 10 > late * 9, "with noClutter a wobbling spot is not muted (shown %d of %d after 35 s)", fanVisLate, late);
+  }
+
   // ---- 5) range / field-of-view gate -----------------------------------------
   {
     Tracker T;

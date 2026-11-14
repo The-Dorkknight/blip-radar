@@ -18,12 +18,14 @@ jobs:
       - name: Native tracker + OLED render tests
         run: |
           g++ -std=c++17 -O2 -Wall -Wextra -I firmware/include tests/test_tracker.cpp -o test_tracker && ./test_tracker
+          g++ -std=c++17 -O2 -Wall -Wextra -I firmware/include tests/test_gate.cpp -o test_gate && ./test_gate
           g++ -std=c++17 -Wall -Wextra -I firmware/include tests/oled_render.cpp -o oled_render && ./oled_render .
       - name: Python tests
         run: |
           pip install pyserial
-          python3 tests/test_parser_py.py && python3 tests/test_tracker_py.py && python3 tests/test_launchers.py
+          python3 tests/test_parser_py.py && python3 tests/test_tracker_py.py && python3 tests/test_gate_py.py && python3 tests/test_launchers.py
           python3 tests/test_flasher.py
+          python3 tests/test_cfw_flasher.py
           python3 tests/test_soak.py
           python3 tests/test_analyze_wav.py
       - name: Embedded UI regenerates

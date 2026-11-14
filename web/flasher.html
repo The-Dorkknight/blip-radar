@@ -67,6 +67,8 @@
 #flash .fl-banner.tip{border-color:#7a5a00;background:#2b2200}
 #flash .fl-banner.tip b{color:var(--warn)}
 #flash .fl-banner p{margin:2px 0 0}
+#flash .fl-banner p b{display:inline;font-size:inherit;margin:0}
+#flash .fl-chk span{flex:1;min-width:0}
 #flash .fl-banner code{background:#00000055;padding:1px 5px;border-radius:4px;font-size:12px;user-select:all}
 #flash .fl-logh{display:flex;justify-content:space-between;align-items:center;margin:14px 0 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
 #flash .fl-mini{all:unset;cursor:pointer;margin-left:8px;padding:3px 9px;border:1px solid var(--line);border-radius:6px;font-size:11px;color:var(--dim);letter-spacing:.04em}
@@ -99,6 +101,7 @@
   <div class="fl-tabs" role="tablist" aria-label="Flasher">
     <button class="fl-tab" id="flTabFlash" role="tab" type="button">⚡ Flash Blip</button>
     <button class="fl-tab" id="flTabDiag" role="tab" type="button">🩺 Diagnostics</button>
+    <button class="fl-tab" id="flTabCfw" role="tab" type="button">☢ LD2450 custom firmware</button>
   </div>
   <div class="fl-hero">
     <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M27 4 10 27h12l-3 17 19-25H26z"/></svg>
@@ -106,6 +109,7 @@
     <p class="muted" id="flHeroP">Plug the board into this computer with a USB <b>data</b> cable, pick what you have, press Flash. It writes the firmware bundled with this release (after checking its checksum), or builds your own. Then join the board's Wi-Fi hotspot to use it.</p></div>
   </div>
 
+  <div id="flNormal">
   <div class="fl-h"><span class="fl-n">1</span> Board</div>
   <div class="fl-pick" id="flBoards"></div>
   <div class="fl-h"><span class="fl-n">2</span> <span id="flFwH">Firmware</span></div>
@@ -113,10 +117,24 @@
   <div class="fl-h"><span class="fl-n">3</span> How</div>
   <div class="fl-pick" id="flModes"></div>
   <div class="fl-fw" id="flFw" aria-live="polite"></div>
-  <div class="fl-h"><span class="fl-n">4</span> USB port</div>
+  </div>
+  <div id="flCfw" hidden>
+    <div class="fl-banner bad"><b>⚠ EXPERIMENTAL — BRICK RISK</b>
+      <p>This writes <b>third-party</b> firmware to the HLK-LD2450 radar itself (not to the ESP32): <a href="https://github.com/earlynerd/HLK-LD2450_FW" target="_blank" rel="noopener">earlynerd/HLK-LD2450_FW</a>, MIT licence. It replaces the module's target reports with raw range-bin data streamed over the radar's <b>own USB pins</b>, for a PC viewer. While it is on, Blip's ESP32 cannot use that radar. Restoring stock has been done on its author's bench, but a failed write can leave a module needing recovery or dead. Use a <b>spare</b> radar. Nothing here is tested by Blip's author yet.</p></div>
+    <div class="fl-h"><span class="fl-n">1</span> Before you start</div>
+    <label class="fl-chk"><input type="checkbox" class="flPre"> <span>The radar runs Hi-Link stock <b>V2.14</b> (update it over <b>Bluetooth</b> with the HLKRadarTool phone app; older versions can't enter this update mode)</span></label>
+    <label class="fl-chk"><input type="checkbox" class="flPre"> <span>Its UART is set to <b>256000</b> baud in the same app (V2.14 can come up at 9600)</span></label>
+    <label class="fl-chk"><input type="checkbox" class="flPre"> <span>The 4-pin plug is wired to a <b>3.3 V USB-serial adapter</b>: 5V→5V, GND→GND, radar TX→adapter RX, radar RX→adapter TX (not to the ESP32)</span></label>
+    <label class="fl-chk"><input type="checkbox" class="flPre"> <span>This is a spare radar and I accept it may be bricked</span></label>
+    <div class="fl-h"><span class="fl-n">2</span> What to do</div>
+    <div class="fl-pick" id="flCfwActs"></div>
+    <div class="fl-fw" id="flCfwInfo"></div>
+  </div>
+  <div class="fl-h"><span class="fl-n" id="flPortN">4</span> <span id="flPortH">USB port</span></div>
   <div class="fl-port"><span class="fl-led" id="flLed"></span><select id="flPort" aria-label="Serial port"></select><button class="b" id="flRefresh" type="button" title="Look again" aria-label="Refresh ports">↻</button></div>
   <p class="muted" id="flPortMsg" style="margin:6px 0 0"></p>
   <label class="fl-chk"><input type="checkbox" id="flMon" checked> Show the board's serial output when it is done</label>
+  <label class="fl-chk" id="flConfL" hidden><span>Type <b>BRICK</b> to allow writing to the radar:</span> <input id="flConf" autocomplete="off" spellcheck="false" style="width:7em;background:var(--fl-well,#071a0f);color:var(--txt);border:1px solid var(--bad);border-radius:6px;padding:5px 8px"></label>
 
   <div class="fl-go">
     <button class="b fl-flash" id="flGo" type="button">⚡ Flash firmware</button>
@@ -157,15 +175,25 @@
 const TOKEN="__BLIP_TOKEN__";
 const root=document.getElementById('flash');
 const $=s=>root.querySelector(s);
-const MODES={quick:['Firmware','Flash tool','Upload','Boot'],source:['Prepare','PlatformIO','Build','Upload','Boot'],log:['Serial tool','USB log']};
+const MODES={quick:['Firmware','Flash tool','Upload','Boot'],source:['Prepare','PlatformIO','Build','Upload','Boot'],log:['Serial tool','USB log'],
+ 'cfw-probe':['Download','Tools','Probe'],'cfw-install':['Download','Tools','Upload'],'cfw-update':['Download','Tools','Upload'],'cfw-restore':['Download','Tools','Restore'],'cfw-viewer':['Download','Tools','Viewer']};
+const CFW_ACTS=[
+ {id:'cfw-probe',name:'1 · Probe (safe)',blurb:'Asks the radar its version and whether it will enter update mode. Writes nothing. Do this first.',go:'🔎 Probe the radar'},
+ {id:'cfw-install',name:'2 · Install custom firmware',blurb:'From stock V2.14. Writes the range-bin image (SHA-256 checked). Brick risk.',go:'☢ Install custom firmware',w:1},
+ {id:'cfw-viewer',name:'3 · Open its live viewer',blurb:'Runs the project\'s browser viewer on this PC at 127.0.0.1:8765. Needs the radar\'s USB pads (D+, D−, GND) wired to the PC.',go:'📡 Start the viewer'},
+ {id:'cfw-update',name:'Update custom firmware',blurb:'For a radar that already runs a custom image. Brick risk.',go:'☢ Re-flash custom firmware',w:1},
+ {id:'cfw-restore',name:'Restore stock firmware',blurb:'Puts Hi-Link V2.14 back. Afterwards set 256000 baud in HLKRadarTool. Brick risk.',go:'↩ Restore stock firmware',w:1}];
 const MODE_CARDS=[
  {id:'quick',name:'Quick flash (recommended)',blurb:'Writes the firmware bundled with this release, after checking its checksum. Needs only esptool (about 40 MB, once). No Git, no compiler.'},
  {id:'source',name:'Build from source',blurb:'Compiles this folder with PlatformIO, so your own changes go in. Needs Git and a few GB of tools the first time.'}];
-const sel={board:'c3',radar:'rd03d',port:'auto',monitor:true,mode:'quick',tab:'flash'};
+const sel={board:'c3',radar:'rd03d',port:'auto',monitor:true,mode:'quick',tab:'flash',cfw:'cfw-probe'};
 try{Object.assign(sel,JSON.parse(localStorage.getItem('blip.flash')||'{}'));}catch(e){}
-if(!MODES[sel.mode]||sel.mode==='log')sel.mode='quick';
+if(!MODES[sel.mode]||sel.mode==='log'||sel.mode.startsWith('cfw-'))sel.mode='quick';
+if(!CFW_ACTS.some(a=>a.id===sel.cfw))sel.cfw='cfw-probe';
 if(sel.radar==='bench')sel.radar='rd03d';
-if(sel.tab!=='diag')sel.tab='flash';
+if(sel.tab!=='diag'&&sel.tab!=='cfw')sel.tab='flash';
+const cfwTab=()=>sel.tab==='cfw';
+const cfwAct=()=>CFW_ACTS.find(a=>a.id===sel.cfw);
 const diag=()=>sel.tab==='diag';
 const radarId=()=>diag()?'bench':sel.radar;
 const save=()=>{try{localStorage.setItem('blip.flash',JSON.stringify(sel));}catch(e){}};
@@ -212,20 +240,34 @@ function pickRadars(){
 }
 function setTab(t){
   if(running())return;
-  sel.tab=t;save();renderTab();
+  sel.tab=t;save();renderTab();lastPorts='';if(info)renderPorts(info.ports);
   if(info){pickRadars();renderFw();}
 }
+const preOk=()=>!cfwTab()||Array.from(root.querySelectorAll('.flPre')).every(x=>x.checked);
+function renderCfw(){
+  const el=$('#flCfwActs');el.textContent='';
+  CFW_ACTS.forEach(it=>{const b=document.createElement('button');b.type='button';b.className='fl-card';b.setAttribute('aria-pressed',String(sel.cfw===it.id));
+    const t=document.createElement('b');t.textContent=it.name;const sm=document.createElement('small');sm.textContent=it.blurb;b.append(t,sm);
+    b.onclick=()=>{if(running())return;sel.cfw=it.id;save();renderCfw();buildSteps(MODES[sel.cfw]);};el.appendChild(b);});
+  const a=cfwAct();$('#flConfL').hidden=!a.w;$('#flGo').textContent=a.go;if(!running())$('#flGo').disabled=!preOk();
+  const box=$('#flCfwInfo');box.textContent='';
+  if(info&&info.cfw){const p=document.createElement('p');p.style.margin='0';
+    p.textContent=(info.cfw.downloaded?'Downloaded: ':'First use downloads (about 50 MB): ')+info.cfw.repo+' at commit '+info.cfw.commit.slice(0,12)+'. Image SHA-256 '+info.cfw.image_sha256.slice(0,16)+'… is checked before anything runs. Blip only runs that project\'s own tools (uart_upload.py, restore_stock.py, stock_uart.py, live_radar.py).';box.appendChild(p);}
+}
 function renderTab(){
-  const d=diag();
-  $('#flTabFlash').setAttribute('aria-selected',String(!d));$('#flTabDiag').setAttribute('aria-selected',String(d));
+  const d=diag(),c=cfwTab();
+  $('#flTabFlash').setAttribute('aria-selected',String(!d&&!c));$('#flTabDiag').setAttribute('aria-selected',String(d));$('#flTabCfw').setAttribute('aria-selected',String(c));
+  $('#flPio').hidden=c;  $('#flNormal').hidden=c;$('#flCfw').hidden=!c;$('#flUsbLog').hidden=c;$('#flPortN').textContent=c?'3':'4';$('#flPortH').textContent=c?'USB-serial adapter the radar is wired to':'USB port';
   $('#flHeroT').textContent=d?'Test a board before you trust it':'Flash a real Blip node';
   $('#flHeroP').textContent=d?'Flashes a separate pass/fail test, not Blip: chip, RAM, PSRAM, flash (including a fake-capacity check), Wi-Fi radio and pins, then 2 minutes of Stetho + Wi-Fi under load. The results print in the log below. Flash Blip again from the other tab afterwards.'
     :'Plug the board into this computer with a USB data cable, pick what you have, press Flash. It writes the firmware bundled with this release (after checking its checksum), or builds your own. Then join the board\'s Wi-Fi hotspot to use it.';
   $('#flFwH').textContent=d?'Test':'Firmware';
   $('#flGo').textContent=d?'🩺 Flash the bench test':'⚡ Flash firmware';
-  $('#flMon').closest('label').hidden=d;
+  $('#flMon').closest('label').hidden=d||c;
+  if(c){$('#flHeroT').textContent='HLK-LD2450 custom firmware (experimental)';$('#flHeroP').textContent='Flash, check and undo the third-party range-bin firmware on an HLK-LD2450 radar, through a USB-serial adapter on its 4-pin plug.';renderCfw();}
+  else{$('#flConfL').hidden=true;if(!running())$('#flGo').disabled=false;}
 }
-$('#flTabFlash').onclick=()=>setTab('flash');$('#flTabDiag').onclick=()=>setTab('diag');
+$('#flTabFlash').onclick=()=>setTab('flash');$('#flTabDiag').onclick=()=>setTab('diag');$('#flTabCfw').onclick=()=>setTab('cfw');
 function renderPorts(ports){
   const key=JSON.stringify(ports);if(key===lastPorts)return;lastPorts=key;
   const s=$('#flPort');s.textContent='';s.add(new Option('Auto-detect (the one USB board plugged in)','auto'));
@@ -233,7 +275,7 @@ function renderPorts(ports){
   if(!Array.from(s.options).some(o=>o.value===sel.port))sel.port='auto';
   s.value=sel.port;
   $('#flLed').className='fl-led'+(ports.length?' on':'');
-  $('#flPortMsg').textContent=ports.length===0?'No board detected yet. Plug it in with a data cable; if nothing appears, hold BOOT while plugging it in.'
+  $('#flPortMsg').textContent=cfwTab()?(ports.length?'Pick the USB-serial adapter wired to the radar (not the ESP32). The radar tools need an explicit port.':'No serial adapter found. Plug in the USB-serial adapter wired to the radar.'):ports.length===0?'No board detected yet. Plug it in with a data cable; if nothing appears, hold BOOT while plugging it in.'
     :ports.length===1?'Found one serial port — that is probably your board.':'Found '+ports.length+' serial ports. Pick the board\'s own if Auto-detect guesses wrong.';
 }
 $('#flPort').onchange=e=>{sel.port=e.target.value;save();renderFw();};
@@ -266,7 +308,7 @@ function renderFw(){
   const p=document.createElement('p');p.textContent='Blip checks the file against this checksum before writing, then runs: esptool --chip '+chip+(sel.port!=='auto'?' --port '+sel.port:'')+' write_flash 0x0 '+img.file;
   box.appendChild(p);
 }
-function onPick(){if(!running()){buildSteps(MODES[sel.mode]);}renderFw();}
+function onPick(){if(!running()){buildSteps(MODES[cfwTab()?sel.cfw:sel.mode]);}renderFw();}
 
 // ---- stepper + job state
 function buildSteps(names){const ol=$('#flSteps');ol.textContent='';ol.dataset.names=names.join('|');names.forEach((n,i)=>{const li=document.createElement('li');li.className='todo';const ic=document.createElement('i');ic.textContent=String(i+1);li.append(ic,document.createTextNode(n));ol.appendChild(li);});}
@@ -276,7 +318,9 @@ function renderJob(){
   const run=running();
   root.classList.toggle('fl-busy',run);
   const logOnly=j.mode==='log';
-  $('#flGo').disabled=run;$('#flGo').textContent=run&&!logOnly?(j.state==='monitoring'?'Flashed ✓':'Flashing…'):(diag()?'🩺 Flash the bench test':'⚡ Flash firmware');
+  const cfwJob=(j.mode||'').startsWith('cfw-');
+  $('#flGo').disabled=run||!preOk();
+  $('#flGo').textContent=run&&!logOnly?(cfwJob?(j.state==='monitoring'?'Viewer running':'Working…'):j.state==='monitoring'?'Flashed ✓':'Flashing…'):(cfwTab()?cfwAct().go:diag()?'🩺 Flash the bench test':'⚡ Flash firmware');
   $('#flUsbLog').disabled=run;$('#flUsbLog').textContent=run&&logOnly?'🔌 Watching…':'🔌 USB log';
   $('#flStop').hidden=!run;$('#flStop').textContent=j.state==='monitoring'?'Stop watching':'Cancel';
   $('#flPort').disabled=run;$('#flMon').disabled=run;
@@ -294,7 +338,12 @@ function renderJob(){
   $('#flTime').textContent=run?mmss(j.elapsed):'';
   // banner
   const b=$('#flBanner');b.textContent='';
-  if(j.flashed){
+  if(j.flashed&&cfwJob){
+    const d=document.createElement('div');d.className='fl-banner ok';
+    d.innerHTML=j.mode==='cfw-restore'?'<b>✓ Stock firmware restored.</b><p>It now runs at 9600 baud: set 256000 in the HLKRadarTool app, then it works with Blip again.</p>'
+      :'<b>✓ Custom firmware written.</b><p>The radar now streams range bins over its own USB pads (D+, D−, GND), not target reports on the 4-pin plug. Wire those pads to this PC and use <b>Open its live viewer</b>. Use <b>Restore stock firmware</b> to give it back to Blip.</p>';
+    b.appendChild(d);
+  }else if(j.flashed){
     const d=document.createElement('div');d.className='fl-banner ok';
     if(/bench/.test(j.env||'')){d.innerHTML='<b>✓ Bench test flashed.</b><p>Its results print in the log below (stage 1 takes about 15 s). Stage 2 starts a hotspot named <code>Blip-Bench-…</code> (password <code>blipblip</code>): join it with a phone or laptop and the 2-minute run starts. If the board resets mid-run, the next start-up reports <b>Stage 2: FAILED</b> and how far it got. When you are done, use the <b>Flash Blip</b> tab to put Blip back.</p>';}
     else d.innerHTML='<b>✓ Flashed.</b><p>Unplug and re-plug the board (or press RESET). On your phone join Wi-Fi <code>Blip-Radar</code>, password <code>blipblip</code> (unless you changed them), then open <code>http://192.168.4.1/</code>. This same page runs on the node.</p>';
@@ -352,7 +401,19 @@ async function refreshInfo(){
   root.querySelectorAll('[data-os]').forEach(e=>e.hidden=e.dataset.os!==info.os);
 }
 async function pollLog(){const j=await api('/api/flash/log?from='+cursor);snap=j;cursor=j.next;appendLines(j.lines);renderJob();}
+root.querySelectorAll('.flPre').forEach(x=>x.onchange=()=>{if(!running())$('#flGo').disabled=!preOk();});
 $('#flGo').onclick=async()=>{
+  if(cfwTab()){
+    try{
+      const a=cfwAct();
+      cursor=0;allLines=[];logEl.textContent='';hintKey='';$('#flHints').textContent='';
+      buildSteps(MODES[a.id]);
+      await post('/api/flash/start',{mode:a.id,port:sel.port,confirm:a.w?$('#flConf').value.trim().toUpperCase():undefined});
+      $('#flConf').value='';
+      await pollLog();
+    }catch(e){alert(e.message);}
+    return;
+  }
   try{
     cursor=0;allLines=[];logEl.textContent='';hintKey='';$('#flHints').textContent='';
     buildSteps(MODES[sel.mode]);
@@ -380,7 +441,7 @@ async function loop(){
   setTimeout(loop,running()?350:2000);
 }
 renderTab();
-buildSteps(MODES[sel.mode]);
+buildSteps(MODES[cfwTab()?sel.cfw:sel.mode]);
 (async()=>{try{await refreshInfo();await pollLog();}catch(e){}loop();})();
 })();
 </script>

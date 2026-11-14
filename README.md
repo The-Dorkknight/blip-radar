@@ -64,6 +64,8 @@ The idea: use a second, very cheap radar-style module (a £3 CDM324 or HB100 Dop
 | CDM324 + modded MAX4466 front end | Built and tried on a bench (Nov 2026): static fixed by supply caps, but the heartbeat sits at the noise floor even at 2 cm. **Abandoned**: it needs a custom ultra-low-noise, high-gain instrumentation amplifier (and ideally an I/Q module) |
 | Making the RD-03D itself into a Doppler stethoscope | **Not possible through its UART** — see [DESIGN_NOTES.md](DESIGN_NOTES.md) |
 | RD-03D tracking in a real room | Tracks up to 3 targets, and also big metal objects as you walk towards them; noisy in a small house, outdoor test still to do |
+| Clutter options (minimum range, edge limit, handheld mode, strict ghost test) | **Experimental.** Native tests on synthetic scenes pass; simulator street walk works; not tried on a real walk |
+| LD2450 custom firmware tab in the flasher | **Experimental, brick risk.** Tested with stand-in tools (`tests/test_cfw_flasher.py`); never run against a real radar by Blip's author |
 | Enclosure | None yet |
 
 ## Bill of materials
@@ -131,12 +133,12 @@ Prefer the terminal? `cd firmware && pio run -e c3-supermini -t upload` (envs: `
 
 | Screen | What it does |
 |---|---|
-| ![Scope](docs/images/ui-scope.webp) | **Scope** — ±60° sector, rings every 2 m to 8 m, one coloured blip per tracked person with distance and radial speed. Trails fade over 4 s. *Tracker ping* is the original project's buzzer, done in the phone's speaker: faster and higher as the nearest person approaches. *Mirror L/R* flips the picture if you mount the radar the other way round. With the Smart filter on, *Show filtered* draws what it is hiding as dashed rings (ghost / clutter). |
+| ![Scope](docs/images/ui-scope.webp) | **Scope** — ±60° sector, a ring every metre to 8 m (solid and labelled at 2, 4, 6, 8 m; faint at the odd metres), one coloured blip per tracked person, labelled with distance, then whether it is moving closer or away (cm/s), then a dim #number that is only an ID. Trails fade over 4 s. *Tracker ping* is the original project's buzzer, done in the phone's speaker: faster and higher as the nearest person approaches. *Mirror L/R* flips the picture if you mount the radar the other way round. *Standing / 🚶 Handheld* switches handheld mode (below). *Show filtered* draws what Blip is hiding as dashed rings, with the reason: ghost / clutter (Smart filter), near / edge / scenery (clutter options). |
 | ![Targets](docs/images/ui-targets.webp) | **Targets** — the numbers behind the blips plus the raw JSON, handy when checking orientation. |
 | ![Stetho](docs/images/ui-stetho.webp) | **Stetho** — the optional CW Doppler channel. Presets: **Heart** (S1/S2 heart sounds, 20–150 Hz), **Lungs** (breath hiss), **Voice** (throat/larynx buzz), **Wide**, **Raw** (plain Doppler warble). *Listen on phone* plays it live; *Delay* shows how far behind real time you are. Knocks are ducked and limited (red in the trace). **Beat lock** quietens the gaps between beats once a rhythm is found; **Record 10 s → WAV** saves a recording for `tools/analyze_wav.py`; *Experiments* has ADC averaging and the burst blanker (see [docs/STETHO_SIGNAL_NOTES.md](docs/STETHO_SIGNAL_NOTES.md)). **Not a medical device.** |
 | ![Chest motion](docs/images/ui-stetho-vitals.webp) | **Chest motion** view — the 100 Hz motion trace with heart-rate and breathing rates from the pattern trackers (a `?` means only roughly steady); *Beat thumps* adds a synthetic thump on each detected beat. |
 | ![Clean-up](docs/images/ui-stetho-node.webp) | **Clean-up on the node** — noise suppression, bump rejection, AGC or manual gain; **Sound out of the node** — earphones or I2S amp, with its own volume. |
-| ![Settings](docs/images/ui-settings.webp) | **Settings** — single/multi target mode (also on the Radar page as *Track 1 / Track 3*), **Target filter** (Raw / Smart, experimental) with *Forget learned clutter*, **Auto-sleep**, OLED (Auto-detect, or a fixed size), Stetho on/off, radar-off-while-listening, hotspot name and password (reboots). |
+| ![Settings](docs/images/ui-settings.webp) | **Settings** — single/multi target mode (also on the Radar page as *Track 1 / Track 3*), **Target filter** (Raw / Smart, experimental) with *Forget learned clutter*, the **clutter options** (below), **Auto-sleep**, OLED (Auto-detect, or a fixed size), Stetho on/off, radar-off-while-listening, hotspot name and password (reboots). |
 | ![About](docs/images/ui-about.webp) | **About** — version, build date, board, pin map and counters. |
 | ![Flash](docs/images/ui-flash.webp) | **Flash** (simulator on a PC only) — pick board, radar, Quick flash or Build from source, and port; see exactly what will be written; watch the board boot. |
 
@@ -145,6 +147,30 @@ OLED mirror. Each person is a circle with their distance inside: big digit = met
 ![OLED 128x64](docs/images/oled-128x64.webp) ![OLED 128x64, no phone yet](docs/images/oled-128x64-nophone.webp)
 
 ![OLED 128x32](docs/images/oled-128x32.webp)
+
+### Clutter options (Settings, added after the first street test)
+
+All off by default except *Drop frozen targets*, all work in Raw and Smart mode, all **experimental**:
+
+| Option | What it does | When to use it |
+|---|---|---|
+| **Ignore anything closer than** 0.1–1.0 m | drops contacts nearer than that | a persistent contact at 0.2–0.3 m (your own hand, wires near the antennas); 0.5 m is the module's own blind zone anyway |
+| **Ignore the edges** ±65° → ±30° | drops contacts far off to the side | edge-of-view contacts are more often reflections |
+| **Drop frozen targets** after 5–60 s (default 10 s, on) | drops a contact reported at exactly the same x and y to the millimetre for that long; back as soon as it moves | the module locked onto a phantom that stays after everyone has gone |
+| **Handheld mode** (also on the Radar page) | while you carry it, works out your walking speed from the contacts and hides the ones closing in at exactly that speed: lamp posts, parked cars, walls. People moving on their own stay. Stops the Smart filter learning clutter. | walking about with it outdoors. Needs at least two fixed things in view to lock on; a lone lamp post is only hidden for 1.5 s after that |
+| **Strict ghost test** (Smart only) | also hides a contact whose range has moved in step with a nearer one for 3 s, at any bearing, with a similar speed | reflections off side walls or cars. Can now and then hide a second person walking exactly like the first (about 1 frame in 10 in the tests) |
+
+Tested on synthetic scenes only (`tests/test_gate.cpp`, `tests/test_tracker.cpp`), not on a real walk yet. The simulator has a **street walk** button in Settings to try handheld mode. Background in [docs/RADAR_TRACKING_NOTES.md](docs/RADAR_TRACKING_NOTES.md).
+
+### HLK-LD2450 custom firmware (experimental, brick risk)
+
+The flasher's third tab, **☢ LD2450 custom firmware**, runs [earlynerd/HLK-LD2450_FW](https://github.com/earlynerd/HLK-LD2450_FW) (MIT), third-party firmware that turns the LD2450 from "3 targets" into a raw range-bin stream: a Doppler spectrum in every range bin, and slow-time phase fine enough that its author shows breathing and heartbeats at about 0.8 m. **It writes to the radar itself, can brick it, and Blip's author has not tried it yet. Use a spare module.**
+
+- Before: update the LD2450 to stock **V2.14** with Hi-Link's **HLKRadarTool** phone app (Bluetooth), and set its UART to **256000** baud in the app. Bluetooth is only for this step; the firmware itself goes over the 4-pin plug.
+- Wire the 4-pin plug to a **3.3 V USB-serial adapter** (5V, GND, radar TX → adapter RX, radar RX → adapter TX), not to the ESP32.
+- Then: **Probe** (writes nothing) → **Install** (type BRICK) → **Open its live viewer**. **Restore stock** puts Hi-Link V2.14 back (it then runs at 9600 baud; set 256000 in the app again).
+- The data comes out of the radar's **own USB pins** (D+, D−, GND test pads on the board), not the 4-pin plug, so you need a USB cable soldered to those pads to see it. While the custom firmware is on, Blip's ESP32 can't use that radar.
+- First use downloads the project at a pinned commit (about 50 MB) into `.cache/`; both images are checked against pinned SHA-256 values before anything runs.
 
 ## How it works
 
@@ -157,7 +183,7 @@ Blip was written for the **Ai-Thinker RD-03D** (1.25 mm 4-pin socket, 8 m, up to
 - It sends the same 30-byte frame (`AA FF 03 00`, three 8-byte slots, `55 CC`), so the same parser reads it.
 - It has no RD-03D configuration commands, so Blip skips the mode command. *Single (nearest)* is picked in firmware instead.
 - Use the `c3-supermini-ld2450` or `s3-pico-ld2450` build environment (or add `-DRADAR_LD2450=1`). `/api/status` reports `"model":"ld2450"` while it is running.
-- Its pins are on a 2.54 mm header, so jumper wires work. Check the labels on the module: its **TX** goes to the board's **RX** pin, and its **RX** to the board's **TX**.
+- A 4-pin plug (5V, GND, TX, RX; listings disagree on the pitch, so check yours). Check the labels on the module: its **TX** goes to the board's **RX** pin, and its **RX** to the board's **TX**.
 - Weaker than the RD-03D on people who sit very still (the vendor notes this beyond about 2 m), and range is about 6 m.
 - Still 24 GHz, so it clashes with a CDM324 in the same way. Use an HB100 for Stetho, or the radar power switch.
 - **Not tested on hardware yet.** Check the angle direction on the Scope first (*Mirror L/R* in Settings if left and right are swapped).
@@ -169,6 +195,10 @@ Blip was written for the **Ai-Thinker RD-03D** (1.25 mm 4-pin socket, 8 m, up to
 | Phone joins but no page opens | Browse to `http://192.168.4.1/` by hand; some phones silence captive portals. |
 | "radar not sending — check 5 V and TX/RX" | Swap TX/RX (the most common mistake), confirm 5 V at the radar, baud is 256000 (not 115200). |
 | Frames arrive but nobody shows up | The RD-03D only reports **moving** people. Walk about. Check *Mirror L/R* if left/right look swapped. With Smart on, try Raw: the filter may be hiding someone (*Show filtered* tells you why). |
+| A contact that never goes away at 0.2–0.3 m | Usually your hand or wires/glue near the antennas. Settings → **Ignore anything closer than 0.5 m**. Bench check: put the radar on a table and walk away. |
+| A ghost stays put after everyone has gone | The module has locked onto a phantom. Settings → **Drop a target frozen on exactly the same spot** (10 s by default). |
+| Dots move the wrong way left/right | Fixed on 2026-11-14 (Blip had the radars' left/right backwards). If yours still does, the radar is mounted upside down: use *Mirror L/R*. |
+| Lamp posts and cars show up while you walk about | Turn on **Handheld** (Radar page or Settings). |
 | Phantom people / a second "you" further away | Wall or window reflections. Try Settings → Target filter → **Smart**; also mount the radar 1.2–1.5 m high and not facing glass or metal. |
 | A real person keeps vanishing with Smart on | Two people walking in single file, in step, look exactly like a reflection; or someone fidgeting in one spot for 30 s gets muted as clutter. Press *Forget learned clutter* or use Raw. |
 | OLED blank | The node scans for it at boot (0x3C, then 0x3D) and the Logs say what it found. If the picture is wrong or half-missing, pick the size in Settings (Auto assumes 128×64; a 0.91" panel is 128×32). Check 3V3, GND, SDA/SCL (C3: GPIO6/7, S3-Pico: GPIO17/18). SH1106 panels are not supported yet. |
@@ -193,12 +223,12 @@ Blip was written for the **Ai-Thinker RD-03D** (1.25 mm 4-pin socket, 8 m, up to
 ## Repository map
 
 ```
-firmware/        PlatformIO project (src/main.cpp, include/rd03d.h, tracker.h, audio_dsp.h, stetho.h, oled.h, oled_draw.h, web_ui.h)
+firmware/        PlatformIO project (src/main.cpp, include/rd03d.h, gate.h, tracker.h, audio_dsp.h, stetho.h, oled.h, oled_draw.h, web_ui.h)
 firmware/prebuilt/  bundled whole-chip images for the four builds + manifest.json (checksums, version, source hash)
 web/index.html   the phone UI (single file; embedded gzipped into the firmware)
 web/flasher.html   the flasher (served by the PC tool only; never in the firmware)
 web/flash_home.html  the red home page the launcher opens, with the flasher inlined
-tools/           sim_radar.py, flasher.py, serial_tail.py, make_prebuilt.py, make_pdf.py, embed_web.py, draw_illustrations.py, rd03d_py.py, tracker_py.py
+tools/           sim_radar.py, flasher.py, serial_tail.py, make_prebuilt.py, make_pdf.py, embed_web.py, draw_illustrations.py, rd03d_py.py, tracker_py.py, gate_py.py, analyze_wav.py
 tests/           native C++ tests (parser, audio DSP, tracker, OLED render), Python parser + tracker cross-check, flasher (with fake_pio.py), launcher test
 hardware/        wiring, MAX4466 mod (with the DC warning), earphone / I2S amp outputs
 examples/        synthetic RD-03D frames for replay; dsp_before.wav / dsp_after.wav
@@ -207,6 +237,7 @@ docs/            GitHub Pages site + images + Blip-manual.pdf (built by tools/ma
 
 ## Credits
 
+- earlynerd's [HLK-LD2450_FW](https://github.com/earlynerd/HLK-LD2450_FW) (MIT): the custom LD2450 firmware the flasher can install. Downloaded on demand, not bundled.
 - Stevee87's [Arduino-ESP32-Radarproject](https://github.com/Stevee87/Arduino-ESP32-Radarproject) (MIT) for the idea, the tracker-ping behaviour, and (from reading its v1.1 firmware) the enable/end-config wrapping of the mode command. No code was copied.
 - Ai-Thinker for the RD-03D protocol document; the Electronic Clinic write-up for a captured two-target frame used in the tests.
 - See [THIRD_PARTY.md](THIRD_PARTY.md).

@@ -33,6 +33,12 @@ Safety. This runs programs on your computer, so:
 
 Tests set BLIP_PIO / BLIP_ESPTOOL to a stand-in (tests/fake_pio.py), may point
 BLIP_PREBUILT at a copy of firmware/prebuilt, and BLIP_PORTS to pretend ports exist.
+tests/test_cfw_flasher.py also sets BLIP_CFW_URL / _DIR / _PY / _IMAGE_SHA / _STOCK_SHA.
+
+The "LD2450 custom firmware" tab (modes cfw-*) runs earlynerd/HLK-LD2450_FW's own tools on
+an HLK-LD2450 wired to a USB-serial adapter: probe (writes nothing), install, update, restore
+stock, and its live viewer. The project is downloaded at a pinned commit and its two images
+are SHA-256 checked first; writes need an explicit port and the typed word BRICK.
 """
 import glob
 import hashlib
@@ -65,13 +71,13 @@ BOARDS = {
     "c3": {"name": "ESP32-C3 Super Mini", "env": "c3-supermini", "chip": "esp32c3",
            "blurb": "Tiny and cheap. USB-C straight on the chip."},
     "s3": {"name": "Waveshare ESP32-S3-Pico", "env": "s3-pico", "chip": "esp32s3",
-           "blurb": "Pico-shaped, 16 MB flash, CH343 USB-UART."},
+           "blurb": "Waveshare S3-Pico or any ESP32-S3 with 2 MB+ flash (pins as the S3-Pico)."},
 }
 RADARS = {
     "rd03d": {"name": "Ai-Thinker RD-03D", "suffix": "",
               "blurb": "The default. 8 m, 1.25 mm connector."},
     "ld2450": {"name": "HLK-LD2450", "suffix": "-ld2450",
-               "blurb": "2.54 mm header, about 6 m. New, untested on hardware."},
+               "blurb": "4-pin plug, about 6 m. Untested with Blip on hardware."},
     "bench": {"name": "Bench test (not Blip)", "suffix": "-bench",
               "blurb": "Pass/fail check of a new board: RAM, flash, Wi-Fi, pins, then a 2-min Stetho + Wi-Fi run. "
                        "Results show in the log below. Flash Blip again afterwards."},
@@ -80,7 +86,30 @@ MODES = {
     "quick": ["Firmware", "Flash tool", "Upload", "Boot"],
     "source": ["Prepare", "PlatformIO", "Build", "Upload", "Boot"],
     "log": ["Serial tool", "USB log"],          # no flashing: just show the board's serial output
+    # HLK-LD2450 custom firmware (earlynerd/HLK-LD2450_FW), run with that project's own tools
+    "cfw-probe": ["Download", "Tools", "Probe"],
+    "cfw-install": ["Download", "Tools", "Upload"],
+    "cfw-update": ["Download", "Tools", "Upload"],
+    "cfw-restore": ["Download", "Tools", "Restore"],
+    "cfw-viewer": ["Download", "Tools", "Viewer"],
 }
+CFW_WRITES = ("cfw-install", "cfw-update", "cfw-restore")   # these write the radar's flash: typed confirmation needed
+
+# EXPERIMENTAL third-party firmware for the HLK-LD2450 (MIT, (c) 2026 earlynerd). Blip does not
+# bundle it: the pinned commit is downloaded on first use (about 50 MB) and the two images are
+# checked against these SHA-256 values before anything runs. Their tools do the actual work.
+CFW = {
+    "repo": "https://github.com/earlynerd/HLK-LD2450_FW",
+    "commit": "92d0ed11cc34aed8361077462621bf7e6dedee64",
+    "image": "firmware/releases/usb-bins40-20261008/update-two-wire.ufw",
+    "image_sha256": "85015eb67aa15f7f15711aa2523e7c1bf54bc1ede8eac0a6e3a3b45fce34e714",
+    "stock": "5o09fdkye1jo8.ufw",
+    "stock_sha256": "b50856945e587f02e04e693002e8ff23640412d048464e2ceeb041a17b95c093",
+}
+CFW["image_sha256"] = os.environ.get("BLIP_CFW_IMAGE_SHA") or CFW["image_sha256"]    # tests only
+CFW["stock_sha256"] = os.environ.get("BLIP_CFW_STOCK_SHA") or CFW["stock_sha256"]    # tests only
+CFW_URL = os.environ.get("BLIP_CFW_URL") or "https://codeload.github.com/earlynerd/HLK-LD2450_FW/zip/" + CFW["commit"]
+CFW_DIR = os.environ.get("BLIP_CFW_DIR") or os.path.join(ROOT, ".cache", "ld2450-cfw", CFW["commit"][:12])
 
 # Friendly explanations for the errors people actually hit. First match per id wins.
 HINTS = [
@@ -107,6 +136,12 @@ HINTS = [
     ("net", r"Could not resolve|Temporary failure in name resolution|Max retries exceeded|ConnectionError|Connection refused|HTTPSConnectionPool|getaddrinfo failed|ReadTimeoutError|Network is unreachable|Failed to establish a new connection|SSLError|CERTIFICATE_VERIFY_FAILED",
      "This step needs the internet",
      "The first run downloads the flashing tools (Quick flash: about 40 MB; Build from source: a few GB). Connect, then press Flash again — it carries on where it stopped."),
+    ("cfwentry", r"No (stock )?entry|entry not detected|no START|did not acknowledge|Timed out waiting for (READY|START)|no response from the (module|updater)",
+     "The radar didn't enter update mode",
+     "Check: stock firmware is V2.14 (update it with the HLKRadarTool phone app over Bluetooth), its UART is set to 256000 baud in the same app, "
+     "TX goes to RX and RX to TX, the adapter is 3.3 V logic, and the radar has its own 5 V. Power-cycle the radar and try Probe again."),
+    ("cfwlz4", r"No module named .lz4",
+     "A Python module is missing", "Press the button again: Blip installs pyserial and lz4 into .venv first. Needs the internet once."),
     ("disk", r"No space left on device",
      "The disk is full", "Building from source needs several GB for the ESP32 toolchain. Free some space, or use Quick flash."),
 ]
@@ -442,6 +477,139 @@ class Job:
             time.sleep(0.5)
         return None
 
+    # -- HLK-LD2450 custom firmware (third-party, experimental) ---------------
+    def _cfw_fetch(self):
+        """Download + unpack the pinned commit once, then check both images' SHA-256."""
+        self._set_step(0)
+        img = os.path.join(CFW_DIR, CFW["image"])
+        stock = os.path.join(CFW_DIR, CFW["stock"])
+        if not (os.path.exists(img) and os.path.exists(stock)):
+            import tempfile
+            import urllib.request
+            import zipfile
+            self.say("Downloading %s at commit %s (about 50 MB, once)…" % (CFW["repo"], CFW["commit"][:12]))
+            os.makedirs(os.path.dirname(CFW_DIR), exist_ok=True)
+            fd, tmp = tempfile.mkstemp(suffix=".zip", dir=os.path.dirname(CFW_DIR))
+            os.close(fd)
+            try:
+                with urllib.request.urlopen(CFW_URL, timeout=60) as r, open(tmp, "wb") as f:
+                    total = int(r.headers.get("Content-Length") or 0)
+                    got = 0
+                    while True:
+                        if self.cancel:
+                            self._fail("Cancelled.")
+                            return False
+                        b = r.read(65536)
+                        if not b:
+                            break
+                        f.write(b)
+                        got += len(b)
+                        self.pct = int(100 * got / total) if total else None
+                        self.activity = "Downloading… %.1f MB" % (got / 1e6)
+                part = CFW_DIR + ".part"
+                shutil.rmtree(part, ignore_errors=True)
+                with zipfile.ZipFile(tmp) as z:
+                    for m in z.infolist():
+                        name = m.filename.split("/", 1)[1] if "/" in m.filename else ""
+                        if not name or name.endswith("/"):
+                            continue
+                        dest = os.path.normpath(os.path.join(part, name))
+                        if not dest.startswith(os.path.normpath(part) + os.sep):   # no "../" tricks
+                            raise ValueError("unsafe path in the download: " + m.filename)
+                        os.makedirs(os.path.dirname(dest), exist_ok=True)
+                        with z.open(m) as src, open(dest, "wb") as out:
+                            shutil.copyfileobj(src, out)
+                shutil.rmtree(CFW_DIR, ignore_errors=True)
+                os.replace(part, CFW_DIR)
+            except Exception as e:
+                self._line("Download failed: %s" % e)
+                self._fail("Couldn't download the custom firmware project. Check the internet connection, then try again.")
+                return False
+            finally:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+        for path, want, label in ((img, CFW["image_sha256"], "custom image"), (stock, CFW["stock_sha256"], "stock V2.14 image")):
+            got = sha256_file(path) if os.path.exists(path) else "missing"
+            if got != want:
+                self._fail("The %s (%s) doesn't match its pinned SHA-256 (got %s). Not using it. Delete %s and try again."
+                           % (label, os.path.relpath(path, CFW_DIR), got[:16], CFW_DIR))
+                return False
+        self.say("Custom firmware project ready in %s; both images match their pinned SHA-256." % CFW_DIR)
+        return True
+
+    def _cfw_tools(self, viewer=False):
+        self._set_step(1)
+        if os.environ.get("BLIP_CFW_PY"):                 # tests: a stand-in Python, nothing installed
+            return os.environ["BLIP_CFW_PY"]
+        py = _venv_exe("python")
+        mods = "serial, lz4" + (", numpy" if viewer else "")
+        if os.path.exists(py) and subprocess.run([py, "-c", "import " + mods], stdout=subprocess.DEVNULL,
+                                                 stderr=subprocess.DEVNULL).returncode == 0:
+            self.say("pyserial and lz4%s are ready in .venv." % (" and numpy" if viewer else ""))
+            return py
+        pkgs = ["pyserial>=3.5,<4", "lz4"] + (["numpy>=1.24,<3"] if viewer else [])
+        self.say("Installing %s into .venv (one-off, needs the internet)." % ", ".join(pkgs))
+        if not os.path.exists(py):
+            if self._exec([sys.executable, "-m", "venv", VENV]) or self.cancel:
+                self._fail("Couldn't make the .venv folder.")
+                return None
+        if self._exec([py, "-m", "pip", "install", "--progress-bar", "off"] + pkgs) != 0 or self.cancel:
+            self._fail("Couldn't install the Python modules the radar tools need.")
+            return None
+        return py
+
+    def _cfw(self, mode, port):
+        if not self._cfw_fetch():
+            return False
+        py = self._cfw_tools(viewer=mode == "cfw-viewer")
+        if not py:
+            return False
+        self._set_step(2)
+        tools = os.path.join(CFW_DIR, "firmware", "tools")
+        img = os.path.join(CFW_DIR, CFW["image"])
+        if mode == "cfw-probe":
+            self.say("Probing %s: asks the radar its version and whether it will enter update mode. Nothing is written." % port)
+            log = os.path.join(CFW_DIR, "output", "blip-probe-%s.json" % time.strftime("%Y%m%d-%H%M%S"))
+            os.makedirs(os.path.dirname(log), exist_ok=True)
+            rc = self._exec([py, os.path.join(tools, "stock_uart.py"), "--port", port, "--baud", "256000", "--log", log], cwd=CFW_DIR)
+            if rc != 0:
+                self._fail("The probe didn't get an answer it liked (see the log). Nothing was written.")
+                return False
+            self.say("Probe finished. Power-cycle the radar now (the probe can leave it waiting in update mode).")
+        elif mode in ("cfw-install", "cfw-update"):
+            entry = "stock-b2" if mode == "cfw-install" else "custom"
+            self.say("Writing the custom range-bin firmware to the radar on %s (entry: %s). Don't unplug anything. "
+                     "If it sits waiting, power-cycle the radar: the updater catches it in the first 3 seconds." % (port, entry))
+            rc = self._exec([py, os.path.join(tools, "uart_upload.py"), img, "--port", port, "--entry", entry,
+                             "--initial-baud", "256000", "--baud", "256000"], cwd=CFW_DIR)
+            if rc != 0:
+                self._fail("The upload didn't finish. The radar usually keeps its old firmware when that happens; power-cycle it and Probe again. "
+                           "If it already had the custom firmware, use Update again or Restore stock.")
+                return False
+            self.say("Upload reported success. The radar now streams range bins over its own USB pins (D+, D-, GND test pads), "
+                     "not target reports on the 4-pin plug, so Blip's ESP32 can't use it as a normal radar until you Restore stock.")
+        elif mode == "cfw-restore":
+            self.say("Putting Hi-Link's stock V2.14 back on the radar on %s. If nothing happens in 20 s, power-cycle the radar." % port)
+            rc = self._exec([py, os.path.join(tools, "restore_stock.py"), "--port", port], cwd=CFW_DIR)
+            if rc != 0:
+                self._fail("Restore didn't confirm stock firmware (see the log). If programming finished, the radar may be at 9600 baud: "
+                           "set 256000 in the HLKRadarTool app.")
+                return False
+            self.say("Stock firmware is back. It starts at 9600 baud: set 256000 in the HLKRadarTool app before using it with Blip.")
+        else:  # viewer
+            with self.lock:
+                self.state = "monitoring"
+            self.say("Starting the custom firmware's own browser viewer. Open http://127.0.0.1:8765 once it says it is running. "
+                     "The radar's USB pins (D+, D-, GND) must be wired to this computer. Press Stop to close it.")
+            self._exec([py, os.path.join(CFW_DIR, "tools", "live_radar.py"), "--connect"], cwd=CFW_DIR)
+        with self.lock:
+            self.steps[2] = "done"
+            self.state = "done"
+            self.flashed = mode in CFW_WRITES
+        return True
+
     # -- the two ways to get the firmware onto the board ---------------------
     def _quick(self, board, env, port):
         self._set_step(0)
@@ -558,6 +726,17 @@ class Job:
         self.say("Stopped watching the serial port.")
 
     def run(self, mode, board, env, port, monitor):
+        if mode.startswith("cfw-"):
+            try:
+                self._cfw(mode, port)
+            except Exception as e:
+                self._fail("Internal error: %r" % (e,))
+            finally:
+                with self.lock:
+                    if self.state in ("running", "monitoring"):
+                        self.state = "done" if mode == "cfw-viewer" and not self.cancel else "error"
+                    self.proc = None
+            return
         if mode == "log":
             try:
                 self._usb_log(port)
@@ -616,7 +795,14 @@ class Job:
             self.port = port
             self.monitor = monitor
             self.t0 = time.time()
-        if mode == "log":
+        if mode.startswith("cfw-"):
+            self.env = "ld2450-cfw"
+            self.say({"cfw-probe": "HLK-LD2450 custom firmware: probe only, nothing is written.",
+                      "cfw-install": "HLK-LD2450 custom firmware: install from stock V2.14. EXPERIMENTAL, can brick the radar.",
+                      "cfw-update": "HLK-LD2450 custom firmware: re-flash over an existing custom image. EXPERIMENTAL.",
+                      "cfw-restore": "HLK-LD2450: restore Hi-Link stock V2.14 firmware. EXPERIMENTAL.",
+                      "cfw-viewer": "HLK-LD2450 custom firmware: open its live viewer."}[mode])
+        elif mode == "log":
             self.say("Opening the board's USB log (nothing is flashed).")
         else:
             how = "the bundled %s firmware" % RADARS[radar]["name"] if mode == "quick" else "%s firmware built from this folder" % RADARS[radar]["name"]
@@ -749,6 +935,8 @@ def handle(h, path, query):
             "pio": {"state": "ready" if pio else "install"},
             "esptool": {"state": "ready" if esptool_cmd() else "install"},
             "prebuilt": prebuilt_info(),
+            "cfw": {"repo": CFW["repo"], "commit": CFW["commit"], "image_sha256": CFW["image_sha256"],
+                    "downloaded": os.path.exists(os.path.join(CFW_DIR, CFW["image"]))},
             "job": JOB.snapshot(1 << 62),      # no lines: the page asks /api/flash/log for those
         })
 
@@ -770,7 +958,18 @@ def handle(h, path, query):
             return _json(h, 400, {"error": "Bad request"})
         if not isinstance(req, dict):
             return _json(h, 400, {"error": "Bad request"})
-        board, radar, mode = req.get("board"), req.get("radar", "rd03d"), req.get("mode", "quick")
+        board, radar, mode = req.get("board", "c3"), req.get("radar", "rd03d"), req.get("mode", "quick")
+        if isinstance(mode, str) and mode.startswith("cfw-"):
+            port = req.get("port")
+            if mode not in MODES:
+                return _json(h, 400, {"error": "Unknown mode"})
+            if mode != "cfw-viewer" and (not isinstance(port, str) or port == "auto" or not port_ok(port)):
+                return _json(h, 400, {"error": "Pick the USB-serial adapter the LD2450 is wired to. The radar tools never guess the port."})
+            if mode in CFW_WRITES and req.get("confirm") != "BRICK":
+                return _json(h, 400, {"error": "Type BRICK to confirm you accept the risk of bricking the radar."})
+            if not JOB.start("c3", "ld2450", port if isinstance(port, str) else "", False, mode):
+                return _json(h, 409, {"error": "Something is already running."})
+            return _json(h, 200, {"ok": True, "mode": mode})
         port, monitor = req.get("port", "auto"), req.get("monitor", True) is True
         if board not in BOARDS or radar not in RADARS or mode not in MODES:
             return _json(h, 400, {"error": "Unknown board, radar or mode"})

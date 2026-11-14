@@ -42,6 +42,8 @@ Users report the module streams "very frequently" (ESPHome's component adds a th
 
 ## 4. Could the RD-03D be bit-banged into a Doppler stethoscope?
 
+> **Update 2026-11-13:** an experimental custom firmware now exists for the LD2450 (same radar chip) that streams range bins over USB, so raw *digital* data is possible after all. See [docs/RADAR_TRACKING_NOTES.md](docs/RADAR_TRACKING_NOTES.md) §6. The text below is kept as written.
+
 Short answer: **no, not through its UART**, and probably not at all without reverse-engineering an undocumented SoC. Long answer, with numbers.
 
 ### 4.1 What a heartbeat looks like to a radar
@@ -135,7 +137,7 @@ None yet on hardware. From the simulator and tests:
 
 ## 8. Untested / unknown
 
-- **Firmware compiles but has not run.** v0.2.0-wip builds cleanly for both envs with pioarduino (Arduino-ESP32 3.3.12). C3: 13% RAM, app 1.18 MB in the 3 MB `huge_app` partition. S3: 16% RAM. Nothing has been flashed yet.
+- **Firmware compiles but has not run.** v0.2.0-wip builds cleanly for both envs with pioarduino (Arduino-ESP32 3.3.12). C3: 13% RAM, app 1.18 MB in the 3 MB `huge_app` partition (since 2026-11-13 all builds use a 2 MB layout, `firmware/partitions_2mb.csv`, 1.875 MB app). S3: 16% RAM. Nothing has been flashed yet.
 - ADC continuous (DMA) mode at 8 kHz alongside Wi-Fi on the single-core C3: should be fine (it's DMA), but unmeasured. `overruns` and `dropped` in `/api/status` will tell.
 - I2S PDM-TX at 8 kHz on the C3/S3 is used for the earphone output; the clock/up-sampling defaults come from Arduino's `ESP_I2S`. Untested by ear. The ADC and the I2S run from different clock dividers, so a tiny drift may cause a click every few minutes.
 - The real level out of a CDM324 + MAX4466 at 0.3–1 m, and therefore whether heart sounds are audible at all, is unknown until someone builds it.

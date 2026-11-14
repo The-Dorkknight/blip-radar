@@ -9,6 +9,14 @@
 #include <stdarg.h>
 #include <esp_attr.h>
 
+// S3 builds log to UART0 (the Waveshare board's CH343). Many other S3 boards wire their USB
+// socket to the chip's own USB instead, so the log is copied there too. The core only makes
+// its HWCDCSerial when that port is the main Serial, hence Blip's own instance.
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+#include "HWCDC.h"
+inline HWCDC& usbLog() { static HWCDC h; return h; }
+#endif
+
 namespace blog {
 
 static const uint32_t LOG_SIZE = 4096;      // bytes of text kept (about 60 lines)
@@ -54,7 +62,12 @@ inline void logf(const char* fmt, ...) {
   n += m; if (n > (int)sizeof line - 2) n = sizeof line - 2;
   line[n++] = '\n'; line[n] = 0;
   put(line, n);
-  if (!quiet) Serial.write((const uint8_t*)line, n);
+  if (!quiet) {
+    Serial.write((const uint8_t*)line, n);
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+    if (usbLog()) usbLog().write((const uint8_t*)line, n);   // also on the S3's native USB, if a host is listening
+#endif
+  }
 }
 
 // Copy the log, oldest first, into out (NUL-terminated). Returns length.

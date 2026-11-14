@@ -30,6 +30,7 @@ CHAPTERS = [
     ("README.md", "Overview, setup and use"),
     ("HOW_IT_WORKS.md", "How it works"),
     ("DESIGN_NOTES.md", "Design notes and research"),
+    ("docs/RADAR_TRACKING_NOTES.md", "Radar tracking notes: false contacts, range, custom firmware"),
     ("hardware/wiring.md", "Wiring"),
     ("hardware/max4466-mod.md", "Stetho front end: the MAX4466 mod"),
     ("hardware/audio-out.md", "Sound out of the node"),

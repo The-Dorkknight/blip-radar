@@ -1,5 +1,7 @@
 # Stetho signal notes: static, chirps, post-bump dropout, pattern recognition
 
+> **Update 2026-11-13:** a different route exists: the custom LD2450 firmware (earlynerd/HLK-LD2450_FW) exposes range-bin phase, and its author shows heartbeats at about 0.8 m with it. See [RADAR_TRACKING_NOTES.md](RADAR_TRACKING_NOTES.md) §7. Not tried with Blip yet.
+
 > **Status: abandoned, kept as an optional install (2026-11-10).** Author's note: *"Needing to build an ultra-low-noise, ultra-high-gain, fast-slew-rate instrumentation amplifier is just too much work for a 'fun' 30-minute project, but I encourage anyone gifted enough with analogue, or mad enough, to carry on my research 😉"*
 
 Written 2026-11-08 for Blip 0.2.2-wip. Everything measured here was measured on a PC with **synthetic** signals. No claim below has been confirmed on a real board.

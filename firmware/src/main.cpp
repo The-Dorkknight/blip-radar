@@ -31,6 +31,7 @@
 #include "rd03d.h"
 #include "oled.h"
 #include "tracker.h"
+#include "gate.h"
 #include "stetho.h"
 #include "blip_log.h"
 #include "lab.h"
@@ -47,6 +48,9 @@ rd03d::Frame   frame;              // latest decoded frame, straight from the mo
 rd03d::Frame   shown;              // what the phone/OLED get: raw frame, or the Smart tracker's view
 uint16_t       shownIds[rd03d::MAX_TARGETS];
 blip_track::Tracker tracker;       // experimental "Smart" filter
+blip_gate::Gate gate;              // minimum range / edge limit / handheld mode, before Raw or Smart
+struct Dropped { int16_t x, y; uint8_t why; };
+Dropped        gateDrop[rd03d::MAX_TARGETS]; uint8_t gateDropN = 0;   // what the gate removed last frame (phone overlay)
 uint32_t       prevFrameMs = 0;
 uint32_t       lastFrameMs = 0;    // when it arrived
 uint32_t       frameCount1s = 0, fps = 0, fpsWindowStart = 0;
@@ -85,6 +89,11 @@ struct Settings {
   uint8_t  filter;     // 0 = raw module output, 1 = Smart tracker (experimental)
   uint8_t  sleepMin;   // auto-sleep after this many minutes unwatched / unheard; 0 = never
   uint8_t  txp;        // Wi-Fi transmit power: 0 = 8.5 dBm, 1 = 15 dBm, 2 = 19.5 dBm
+  uint8_t  minRangeCm; // ignore contacts closer than this (10 = old behaviour)
+  uint8_t  edgeDeg;    // ignore contacts beyond ±this many degrees (65 = old behaviour)
+  bool     handheld;   // radar is being carried: hide fixed scenery, don't learn clutter
+  bool     strictGhost;// Smart filter: + track-correlation ghost test
+  uint8_t  stuckS;     // drop a target frozen at identical x,y for this long (s), 0 = off
   char     ssid[33];
   char     pass[65];
 } cfg;
@@ -115,6 +124,11 @@ static void loadSettings() {
   cfg.filter              = prefs.getUChar("filter", 0);
   cfg.sleepMin            = prefs.getUChar("sleep", 0);
   cfg.txp                 = prefs.getUChar("txp", TXP_DEFAULT);
+  cfg.minRangeCm          = constrain(prefs.getUChar("minr", 10), 10, 150);
+  cfg.edgeDeg             = constrain(prefs.getUChar("edge", 65), 20, 65);
+  cfg.handheld            = prefs.getBool("hand", false);
+  cfg.strictGhost         = prefs.getBool("sghost", false);
+  cfg.stuckS              = constrain(prefs.getUChar("stuck", 10), 0, 120);
   String s = prefs.getString("ssid", AP_SSID_DEFAULT);
   String p = prefs.getString("pass", AP_PASS_DEFAULT);
   prefs.end();
@@ -139,6 +153,11 @@ static void saveSettings() {
   prefs.putUChar("filter", cfg.filter);
   prefs.putUChar("sleep", cfg.sleepMin);
   prefs.putUChar("txp", cfg.txp);
+  prefs.putUChar("minr", cfg.minRangeCm);
+  prefs.putUChar("edge", cfg.edgeDeg);
+  prefs.putBool("hand", cfg.handheld);
+  prefs.putBool("sghost", cfg.strictGhost);
+  prefs.putUChar("stuck", cfg.stuckS);
   prefs.putString("ssid", cfg.ssid);
   prefs.putString("pass", cfg.pass);
   prefs.end();
@@ -194,11 +213,29 @@ static void radarPower(bool on) {
 #endif
 }
 
+// Settings -> gate + tracker options (cheap; called every frame so a change applies at once)
+static void applyFilterCfg() {
+  gate.cfg.minMm = (uint16_t)cfg.minRangeCm * 10;
+  gate.cfg.maxDeg = cfg.edgeDeg;
+  gate.cfg.handheld = cfg.handheld;
+  gate.cfg.stuckS = cfg.stuckS;
+  tracker.cfg.noClutter = cfg.handheld;
+  tracker.cfg.strictGhost = cfg.strictGhost;
+}
+
 static void radarPoll() {
   while (radarSerial.available()) {
     uint8_t b = (uint8_t)radarSerial.read();
     if (parser.feed(b, frame)) {
       uint32_t t = millis();
+      float gdt = prevFrameMs ? (t - prevFrameMs) / 1000.0f : 0.05f;
+      applyFilterCfg();
+      rd03d::Frame before = frame;
+      gate.apply(frame, gdt);
+      gateDropN = 0;
+      for (int i = 0; i < rd03d::MAX_TARGETS; i++)
+        if (before.t[i].present && gate.why(i) != blip_gate::KEEP)
+          gateDrop[gateDropN++] = {before.t[i].x_mm, before.t[i].y_mm, (uint8_t)gate.why(i)};
       if (!cfg.multi) rd03d::keep_nearest(frame);   // Single mode: the LD2450 always sends three, so pick here
       if (cfg.filter == 1) {
         float dt = prevFrameMs ? (t - prevFrameMs) / 1000.0f : 0.05f;
@@ -235,6 +272,14 @@ static size_t targetsJson(char* out, size_t cap) {
     if (n >= cap - 2) break;
   }
   n += snprintf(out + n, cap - n, "]");
+  if (radarAlive() && gateDropN) {                  // what the gate dropped (any mode), for the overlay
+    n += snprintf(out + n, cap - n, ",\"g\":[");
+    static const char* WHY[5] = {"", "near", "edge", "scenery", "stuck"};
+    for (int i = 0; i < gateDropN && n < cap - 50; i++)
+      n += snprintf(out + n, cap - n, "%s{\"x\":%d,\"y\":%d,\"why\":\"%s\"}", i ? "," : "", gateDrop[i].x, gateDrop[i].y, WHY[gateDrop[i].why > 4 ? 0 : gateDrop[i].why]);
+    n += snprintf(out + n, cap - n, "]");
+  }
+  if (cfg.handheld && radarAlive()) n += snprintf(out + n, cap - n, ",\"ego\":%.0f", gate.ego());
   if (cfg.filter == 1 && radarAlive()) {             // what the Smart filter is hiding, for the phone's overlay
     n += snprintf(out + n, cap - n, ",\"h\":[");
     bool f2 = true;
@@ -287,13 +332,14 @@ static size_t statusJson(char* out, size_t cap) {
   size_t n = snprintf(out, cap,
     "{\"app\":\"Blip\",\"version\":\"%s\",\"build\":\"%s\",\"board\":\"%s\",\"boardId\":\"%s\","
     "\"wip\":true,\"ssid\":\"%s\",\"ip\":\"%s\",\"clients\":%d,"
-    "\"radar\":{\"alive\":%s,\"fps\":%lu,\"frames\":%lu,\"bad\":%lu,\"mode\":\"%s\",\"model\":\"%s\",\"baud\":%d,\"powered\":%s,\"pwrPin\":%d,\"offWhileListening\":%s,\"filter\":\"%s\",\"asleep\":%s},"
+    "\"radar\":{\"alive\":%s,\"fps\":%lu,\"frames\":%lu,\"bad\":%lu,\"mode\":\"%s\",\"model\":\"%s\",\"baud\":%d,\"powered\":%s,\"pwrPin\":%d,\"offWhileListening\":%s,\"filter\":\"%s\",\"asleep\":%s,\"minr\":%u,\"edge\":%u,\"hand\":%s,\"sghost\":%s,\"stuck\":%u},"
     "\"oled\":%u,\"sleepMin\":%u,\"txp\":%u,",
     BLIP_VERSION, BUILD_DATE, BLIP_BOARD, BLIP_BOARD_ID,
     cfg.ssid, WiFi.softAPIP().toString().c_str(), WiFi.softAPgetStationNum(),
     radarAlive() ? "true" : "false", (unsigned long)fps, (unsigned long)parser.frames(), (unsigned long)parser.bad(),
     cfg.multi ? "multi" : "single", RADAR_LD2450 ? "ld2450" : "rd03d", RADAR_BAUD, radarPowered ? "true" : "false", PIN_RADAR_PWR, cfg.radarOff ? "true" : "false",
     cfg.filter == 1 ? "smart" : "raw", radarAsleep ? "true" : "false",
+    cfg.minRangeCm, cfg.edgeDeg, cfg.handheld ? "true" : "false", cfg.strictGhost ? "true" : "false", cfg.stuckS,
     cfg.oled, cfg.sleepMin, cfg.txp);
   if (n >= cap) n = cap - 1;
   const blipdsp::Params& d = cfg.st.dsp;
@@ -423,10 +469,10 @@ static void webBegin() {
     r->send(200, "application/json", buf);
   });
   server.on("/api/targets", HTTP_GET, [](AsyncWebServerRequest* r) {
-    char buf[900]; targetsJson(buf, sizeof buf);
+    char buf[1200]; targetsJson(buf, sizeof buf);
     r->send(200, "application/json", buf);
   });
-  // Settings: /api/config?mode=multi|single&oled=0|1|2|3(auto)&stetho=0|1&ssid=..&pass=..
+  // Settings: /api/config?mode=multi|single&oled=0|1|2|3(auto)&minr=10..150(cm)&edge=20..65&hand=0|1&sghost=0|1&stuck=0..120(s)&stetho=0|1&ssid=..&pass=..
   server.on("/api/config", HTTP_ANY, [](AsyncWebServerRequest* r) {
     bool wifiChanged = false;
     if (r->hasParam("mode"))   { cfg.multi = r->getParam("mode")->value() != "single"; radarSendMode(); }
@@ -445,6 +491,11 @@ static void webBegin() {
     if (r->hasParam("radarOff")) cfg.radarOff = r->getParam("radarOff")->value().toInt() != 0;
     if (r->hasParam("filter")) { cfg.filter = r->getParam("filter")->value() == "smart" ? 1 : 0; tracker.reset(); }
     if (r->hasParam("forget")) tracker.forgetClutter();
+    if (r->hasParam("minr"))   cfg.minRangeCm = constrain((int)r->getParam("minr")->value().toInt(), 10, 150);
+    if (r->hasParam("edge"))   cfg.edgeDeg = constrain((int)r->getParam("edge")->value().toInt(), 20, 65);
+    if (r->hasParam("hand"))   { cfg.handheld = r->getParam("hand")->value().toInt() != 0; gate.reset(); tracker.reset(); }
+    if (r->hasParam("stuck"))  { cfg.stuckS = constrain((int)r->getParam("stuck")->value().toInt(), 0, 120); gate.reset(); }
+    if (r->hasParam("sghost")) { cfg.strictGhost = r->getParam("sghost")->value().toInt() != 0; tracker.reset(); }
     if (r->hasParam("sleep"))  { cfg.sleepMin = constrain((int)r->getParam("sleep")->value().toInt(), 0, 60); lastWatchedMs = lastHeardMs = millis(); stethoPending = true; }
     if (r->hasParam("preset") || r->hasParam("ns") || r->hasParam("bump") || r->hasParam("maxgain") || r->hasParam("gain") ||
         r->hasParam("agc") || r->hasParam("out") || r->hasParam("ovol") || r->hasParam("radarOff")) stethoPending = true;
@@ -574,6 +625,10 @@ void setup() {
   bootCount++;
   heap_caps_register_failed_alloc_callback(onAllocFailed);
   Serial.begin(115200);
+#if defined(CONFIG_IDF_TARGET_ESP32S3) && !ARDUINO_USB_CDC_ON_BOOT
+  usbLog().setTxTimeoutMs(0);      // S3 boards wired to the chip's own USB (no CH343): copy the log there too, never block
+  usbLog().begin();
+#endif
 #if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
   Serial.setTxTimeoutMs(0);     // USB serial: never wait for a PC that isn't reading
 #endif
@@ -618,7 +673,7 @@ void loop() {
   bool fresh = parser.frames() != lastTargetsFrames;
   if (!(lab::f.text & 1) && ws.count() > 0 && ((fresh && now - lastWsMs >= WS_TARGET_RATE_MS) || now - lastWsMs >= 1000)) {
     lastWsMs = now; lastTargetsFrames = parser.frames();
-    char buf[900]; size_t n = targetsJson(buf, sizeof buf);
+    char buf[1200]; size_t n = targetsJson(buf, sizeof buf);
     ws.textAll(buf, n);
   }
 

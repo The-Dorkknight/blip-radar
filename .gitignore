@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 .venv/
+.cache/
 venv/
 firmware/.pio/
 firmware/.vscode/

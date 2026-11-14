@@ -22,6 +22,14 @@
 //                                       for 30 s (fan, curtain) is muted; the spot is remembered
 //                                       for a few minutes
 //
+// Two options (Settings, added 2026-11-13):
+//   strictGhost   also call B a ghost when its range history moves in step with a nearer
+//                 track A (over the last 3 s the two ranges correlate > 0.9, B's range
+//                 changes at 0.6-1.4x A's rate, and their Doppler speeds roughly match), whatever
+//                 the bearing: multipath ghosts copy the real target's motion. Off by default.
+//   noClutter     don't learn or apply the clutter map. Set while the radar is carried
+//                 (handheld mode): the map is fixed to the radar, so it means nothing then.
+//
 // Plain C++ (no Arduino) so tests/test_tracker.cpp runs it natively.
 // tools/tracker_py.py is a line-by-line Python port used by the simulator;
 // tests/test_tracker_py.py checks the two agree.
@@ -34,6 +42,7 @@
 namespace blip_track {
 
 static const int MAX_TRACKS = 6;
+static const int RHIST = 60;               // range history per track (3 s at 20 fps), for the strict ghost test
 static const int GRID = 16;                // clutter map: 16 × 16 cells of 0.5 m
 static const float CELL_MM = 500.0f;
 
@@ -49,6 +58,9 @@ struct Cfg {
   float clutterS = 30.0f;                  // in-place wobble this long → clutter
   float clutterRadius = 400;               // "in place" = within this of where it started
   float ghostBearingDeg = 10, ghostBehindMm = 500, ghostS = 1.0f;
+  bool strictGhost = false;               // + track-correlation ghost test
+  float ghostCorr = 0.9f;                  // ... range correlation above this
+  bool noClutter = false;                  // don't learn / apply the clutter map (radar being carried)
 };
 
 struct Track {
@@ -66,6 +78,10 @@ struct Track {
   bool suspect = false;                    // sits behind a moving track on the same bearing
   float age = 0;                           // seconds since the track was born
   uint16_t ghostOf = 0;
+  float rh[RHIST] = {0};                   // recent ranges (mm), newest at rh[(ri+RHIST-1)%RHIST]
+  uint8_t ri = 0, rn = 0;
+  void pushRange() { rh[ri] = range(); ri = (uint8_t)((ri + 1) % RHIST); if (rn < RHIST) rn++; }
+  float rAgo(int k) const { return rh[(ri + 2 * RHIST - 1 - k) % RHIST]; }
   float range() const { return sqrtf(x * x + y * y); }
   float bearingDeg() const { return atan2f(x, y) * 57.29578f; }
   float radialV() const { float r = range(); return r > 1 ? (x * vx + y * vy) / r : 0; }
@@ -125,6 +141,8 @@ class Tracker {
       }
     }
 
+    for (auto& t : tr_) if (t.used) t.pushRange();
+
     // 7. ghosts: B is farther than A along (nearly) the same bearing and its
     //    range changes at the same rate — the classic "reflection behind you".
     //    Runs before confirmation so a reflection can be caught before it ever shows.
@@ -144,6 +162,7 @@ class Tracker {
           sus = true;
           if (fabsf(vb - va) < fmaxf(150.0f, 0.3f * fabsf(va))) { cond = true; of = a.id; break; }
         }
+        if (cfg.strictGhost && behind && fabsf(vb - va) < fmaxf(200.0f, 0.4f * fabsf(va)) && rangeCorr(a, b) > cfg.ghostCorr) { cond = true; of = a.id; break; }
       }
       b.suspect = sus;
       b.ghostT += cond ? dt : -dt;
@@ -158,7 +177,7 @@ class Tracker {
       if (!t.used) continue;
       int hits = popcount5(t.hist);
       if (t.st == TENTATIVE) {
-        bool clutterCell = cellScore(t.x, t.y) > 128;
+        bool clutterCell = !cfg.noClutter && cellScore(t.x, t.y) > 128;
         bool wait = t.suspect && t.age < cfg.ghostS + 0.5f;   // possible reflection: give the ghost test time
         // born on a known clutter spot: track it but keep it muted until it walks 0.8 m away
         if (hits >= cfg.confirmHits && !wait) { t.st = clutterCell ? CLUTTER : CONFIRMED; if (clutterCell) markCell(t.x, t.y); }
@@ -173,7 +192,7 @@ class Tracker {
       if (ddx * ddx + ddy * ddy > lim * lim) {
         t.ax = t.sx; t.ay = t.sy; t.still = 0;
         if (t.st == CLUTTER) t.st = CONFIRMED;               // it walked away: it's real
-      } else if (t.unseen < 0.5f) {                        // seen recently (the chip only has 3 slots to share)
+      } else if (t.unseen < 0.5f && !cfg.noClutter) {     // seen recently (the chip only has 3 slots to share)
         t.still += dt;
         // 30 s to learn a new spot; on a spot already known as clutter, 3 s is enough
         float need = cellScore(t.sx, t.sy) > 128 ? 3.0f : cfg.clutterS;
@@ -201,6 +220,26 @@ class Tracker {
     }
   }
 
+  // Strict ghost test: correlation of the two tracks' last 3 s of ranges, or 0 when there
+  // is too little history, A hardly moved (a still target casts no tell-tale moving ghost),
+  // or B's range changes at a clearly different rate (slope outside 0.6-1.4).
+  static float rangeCorr(const Track& a, const Track& b) {
+    int m = a.rn < b.rn ? a.rn : b.rn;
+    if (m < RHIST) return 0;
+    float sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0, lo = 1e9f, hi = -1e9f;
+    for (int k = 0; k < m; k++) {
+      float ra = a.rAgo(k), rb = b.rAgo(k);
+      if (ra < lo) lo = ra;
+      if (ra > hi) hi = ra;
+      sa += ra; sb += rb; saa += ra * ra; sbb += rb * rb; sab += ra * rb;
+    }
+    if (hi - lo < 400) return 0;
+    float va = saa - sa * sa / m, vb = sbb - sb * sb / m, cab = sab - sa * sb / m;
+    if (va <= 1e-3f || vb <= 1e-3f) return 0;
+    float slope = cab / va;
+    if (slope < 0.6f || slope > 1.4f) return 0;
+    return cab / sqrtf(va * vb);
+  }
   uint8_t cellScore(float x, float y) const { int ix, iy; cell(x, y, ix, iy); return clutter_[iy][ix]; }
 
  private:

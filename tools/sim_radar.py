@@ -42,7 +42,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flasher  # noqa: E402
 import rd03d_py  # noqa: E402
-import tracker_py  # noqa: E402
+import tracker_py
+import gate_py  # noqa: E402
 
 __version__ = "0.2.2-wip"
 __build_date__ = time.strftime("%Y-%m-%d %H:%M")
@@ -53,6 +54,7 @@ INDEX = os.path.join(ROOT, "web", "index.html")
 STATE = {
     "multi": True, "oled": 2, "stetho": True, "ssid": "Blip-Radar", "pass": "blipblip",
     "filter": "raw", "sleep": 0, "messy": True,
+    "minr": 10, "edge": 65, "hand": False, "sghost": False, "stuck": 10, "simwalk": False,
     "preset": "heart", "ns": 60, "bump": 50, "agc": True, "maxgain": 36, "gain": 12, "out": 0, "ovol": 60,
     "frames": 0, "bad": 0, "fps": 0,
 }
@@ -100,9 +102,36 @@ class Walker:
 
 WALKERS = [Walker(1), Walker(2), Walker(3)]
 TRACKER = tracker_py.Tracker()
+GATE = gate_py.Gate()
+SHOWN = []          # (x, y, v) after the gate: what Raw mode shows
+GATE_DROP = []      # (x, y, why) the gate removed, for the "Show filtered" overlay
+STREET = {"pos": 0.0}
 MESS = random.Random(99)
 LAST_FRAME = rd03d_py.Frame()
 REPLAY = None
+
+
+def street_dets(walkers):
+    """Simulator only: the radar is carried down a street at 1.2 m/s. Lamp posts every
+    6 m on both kerbs close in at our walking speed; walker 1 is a pedestrian coming the
+    other way; the carrier's own hand sits at about 0.25 m now and then."""
+    walk = 1200.0
+    STREET["pos"] += walk * 0.05
+    out = []
+    for side in (-2200, 2600):
+        for k in range(3):
+            y = 6000 * k + 1500 - (STREET["pos"] % 6000) + (2000 if side > 0 else 0)
+            if 400 < y < 7500:
+                r = math.hypot(side, y)
+                out.append((side + MESS.gauss(0, 80), y + MESS.gauss(0, 50), -(walk * y / r + MESS.gauss(0, 60)) / 10))
+    w = walkers[0]
+    if w.on:
+        py = 7000 - (STREET["pos"] * 1.8) % 6500
+        out.append((400 + MESS.gauss(0, 80), py, -(walk + 900) / 10))
+    if MESS.random() < 0.4:
+        out.append((MESS.gauss(0, 30), 250 + MESS.gauss(0, 30), MESS.randint(-4, 4)))
+    MESS.shuffle(out)
+    return out
 
 
 def encode_frame(walkers):
@@ -115,7 +144,9 @@ def encode_frame(walkers):
         return struct.pack("<H", (0x8000 if v >= 0 else 0) | (abs(v) & 0x7FFF))
     n = 3 if STATE["multi"] else 1
     dets = []
-    if STATE["messy"]:
+    if STATE["simwalk"]:
+        dets = street_dets(walkers)
+    elif STATE["messy"]:
         for w in walkers[:2]:
             if w.on:
                 dets.append((w.x + MESS.gauss(0, 110), w.y + MESS.gauss(0, 60), w.radial_speed_cms()))
@@ -141,6 +172,24 @@ def encode_frame(walkers):
     return b + bytes([0x55, 0xCC])
 
 
+def gate_extras(j):
+    """Same extra fields as the firmware's targetsJson: g (what the gate dropped), ego."""
+    if LAST_FRAME.alive and GATE_DROP:
+        j["g"] = [{"x": int(x), "y": int(y), "why": w} for (x, y, w) in GATE_DROP]
+    if STATE["hand"] and LAST_FRAME.alive:
+        j["ego"] = round(GATE.ego())
+    return j
+
+
+def apply_filter_cfg():
+    GATE.cfg.min_mm = STATE["minr"] * 10
+    GATE.cfg.max_deg = STATE["edge"]
+    GATE.cfg.handheld = STATE["hand"]
+    GATE.cfg.stuck_s = STATE["stuck"]
+    TRACKER.cfg.no_clutter = STATE["hand"]
+    TRACKER.cfg.strict_ghost = STATE["sghost"]
+
+
 def targets_json():
     t = []
     if STATE["filter"] == "smart":
@@ -150,16 +199,15 @@ def targets_json():
                 d = math.hypot(x, y)
                 t.append({"id": i, "x": x, "y": y, "v": v, "res": 0, "d": round(d), "a": round(math.degrees(math.atan2(x, y)), 1)})
             h = [{"id": i, "x": x, "y": y, "why": why} for (i, x, y, why) in TRACKER.hidden()]
-        return json.dumps({"ms": int(time.time() * 1000) & 0xFFFFFFFF, "alive": LAST_FRAME.alive, "fps": STATE["fps"],
-                           "f": "smart", "sleep": False, "t": t, "h": h})
+        return json.dumps(gate_extras({"ms": int(time.time() * 1000) & 0xFFFFFFFF, "alive": LAST_FRAME.alive, "fps": STATE["fps"],
+                                       "f": "smart", "sleep": False, "t": t, "h": h}))
     if LAST_FRAME.alive:
-        for i, tg in enumerate(LAST_FRAME.t):
-            if not tg.present:
-                continue
-            d = math.hypot(tg.x_mm, tg.y_mm)
-            a = math.degrees(math.atan2(tg.x_mm, tg.y_mm))
-            t.append({"id": i + 1, "x": tg.x_mm, "y": tg.y_mm, "v": tg.v_cms, "res": tg.res_mm, "d": round(d), "a": round(a, 1)})
-    return json.dumps({"ms": int(time.time() * 1000) & 0xFFFFFFFF, "alive": LAST_FRAME.alive, "fps": STATE["fps"], "f": "raw", "sleep": False, "t": t})
+        for i, (x, y, v) in enumerate(SHOWN):
+            d = math.hypot(x, y)
+            a = math.degrees(math.atan2(x, y))
+            t.append({"id": i + 1, "x": x, "y": y, "v": v, "res": 360, "d": round(d), "a": round(a, 1)})
+    j = {"ms": int(time.time() * 1000) & 0xFFFFFFFF, "alive": LAST_FRAME.alive, "fps": STATE["fps"], "f": "raw", "sleep": False, "t": t}
+    return json.dumps(gate_extras(j))
 
 
 START = time.time()
@@ -181,7 +229,8 @@ def status_json():
         "ssid": STATE["ssid"], "ip": "127.0.0.1", "clients": len(CLIENTS),
         "radar": {"alive": LAST_FRAME.alive, "fps": STATE["fps"], "frames": STATE["frames"], "bad": STATE["bad"],
                   "mode": "multi" if STATE["multi"] else "single", "baud": 256000,
-                  "powered": True, "pwrPin": -1, "offWhileListening": False, "filter": STATE["filter"], "asleep": False},
+                  "powered": True, "pwrPin": -1, "offWhileListening": False, "filter": STATE["filter"], "asleep": False,
+                  "minr": STATE["minr"], "edge": STATE["edge"], "hand": STATE["hand"], "sghost": STATE["sghost"], "stuck": STATE["stuck"], "simwalk": STATE["simwalk"]},
         "sleepMin": STATE["sleep"], "txp": STATE.get("txp", 1),
         "oled": STATE["oled"],
         "stetho": {"enabled": STATE["stetho"], "running": STATE["stetho"], "rate": 8000, "frame": 256, "pinI": 1,
@@ -360,6 +409,22 @@ class Handler(BaseHTTPRequestHandler):
                         STATE[k] = max(lo, min(hi, int(q[k])))
                     except ValueError:
                         pass
+            if "minr" in q and q["minr"].isdigit():
+                STATE["minr"] = max(10, min(150, int(q["minr"])))
+            if "edge" in q and q["edge"].isdigit():
+                STATE["edge"] = max(20, min(65, int(q["edge"])))
+            if "hand" in q:
+                STATE["hand"] = q["hand"] == "1"
+                GATE.reset(); TRACKER.reset()
+            if "stuck" in q and q["stuck"].isdigit():
+                STATE["stuck"] = max(0, min(120, int(q["stuck"])))
+                GATE.reset()
+            if "sghost" in q:
+                STATE["sghost"] = q["sghost"] == "1"
+                TRACKER.reset()
+            if "simwalk" in q:                # simulator only: carry the radar down a street
+                STATE["simwalk"] = q["simwalk"] == "1"
+                TRACKER.reset()
             if "filter" in q:
                 STATE["filter"] = "smart" if q["filter"] == "smart" else "raw"
                 TRACKER.reset()
@@ -415,7 +480,7 @@ class Handler(BaseHTTPRequestHandler):
 # Background producers
 # ---------------------------------------------------------------------------
 def radar_loop():
-    global LAST_FRAME
+    global LAST_FRAME, SHOWN, GATE_DROP
     parser = rd03d_py.Parser()
     dt = 0.05
     count = 0
@@ -435,7 +500,10 @@ def radar_loop():
                 fr.alive = True
                 LAST_FRAME = fr
                 count += 1
-                TRACKER.update([(tg.x_mm, tg.y_mm, tg.v_cms) for tg in fr.t if tg.present], dt)
+                apply_filter_cfg()
+                kept, GATE_DROP = GATE.apply([(tg.x_mm, tg.y_mm, tg.v_cms) if tg.present else None for tg in fr.t], dt)
+                SHOWN = kept
+                TRACKER.update(kept, dt)
         STATE["frames"] = parser.frames
         STATE["bad"] = parser.bad
         if time.time() - t0 >= 1:

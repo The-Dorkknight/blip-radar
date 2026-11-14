@@ -11,6 +11,7 @@ the same detections through both and checks they agree.
 import math
 
 MAX_TRACKS = 6
+RHIST = 60
 GRID = 16
 CELL_MM = 500.0
 TENTATIVE, CONFIRMED, GHOST, CLUTTER = 0, 1, 2, 3
@@ -25,11 +26,14 @@ class Cfg:
     coast_s = 1.0
     clutter_s, clutter_radius = 30.0, 400.0
     ghost_bearing_deg, ghost_behind_mm, ghost_s = 10.0, 500.0, 1.0
+    strict_ghost = False
+    ghost_corr = 0.9
+    no_clutter = False
 
 
 class Track:
     __slots__ = ("used", "id", "st", "x", "y", "vx", "vy", "vdop", "vdopf", "hist", "unseen",
-                 "ax", "ay", "still", "sx", "sy", "ghost_t", "suspect", "age", "ghost_of")
+                 "ax", "ay", "still", "sx", "sy", "ghost_t", "suspect", "age", "ghost_of", "rh", "ri", "rn")
 
     def __init__(self):
         self.used = False
@@ -45,12 +49,48 @@ class Track:
         self.suspect = False
         self.age = 0.0
         self.ghost_of = 0
+        self.rh = [0.0] * RHIST
+        self.ri = 0
+        self.rn = 0
+
+    def push_range(self):
+        self.rh[self.ri] = self.range()
+        self.ri = (self.ri + 1) % RHIST
+        if self.rn < RHIST:
+            self.rn += 1
+
+    def r_ago(self, k):
+        return self.rh[(self.ri + 2 * RHIST - 1 - k) % RHIST]
 
     def range(self):
         return math.sqrt(self.x * self.x + self.y * self.y)
 
     def bearing_deg(self):
         return math.atan2(self.x, self.y) * 57.29578
+
+
+def range_corr(a, b):
+    """Same as Tracker::rangeCorr in tracker.h."""
+    m = min(a.rn, b.rn)
+    if m < RHIST:
+        return 0.0
+    sa = sb = saa = sbb = sab = 0.0
+    lo, hi = 1e9, -1e9
+    for k in range(m):
+        ra, rb = a.r_ago(k), b.r_ago(k)
+        lo = min(lo, ra); hi = max(hi, ra)
+        sa += ra; sb += rb; saa += ra * ra; sbb += rb * rb; sab += ra * rb
+    if hi - lo < 400:
+        return 0.0
+    va = saa - sa * sa / m
+    vb = sbb - sb * sb / m
+    cab = sab - sa * sb / m
+    if va <= 1e-3 or vb <= 1e-3:
+        return 0.0
+    slope = cab / va
+    if slope < 0.6 or slope > 1.4:
+        return 0.0
+    return cab / math.sqrt(va * vb)
 
 
 def _popcount5(h):
@@ -160,6 +200,10 @@ class Tracker:
                 t.vdop = t.vdopf = dv[k]; t.hist = 1
                 self.tr[s] = t
 
+        for t in self.tr:
+            if t.used:
+                t.push_range()
+
         # ghosts
         for b in self.tr:
             if not b.used or b.st == CLUTTER:
@@ -179,6 +223,9 @@ class Tracker:
                     if abs(vb - va) < max(150.0, 0.3 * abs(va)):
                         cond = True; of = a.id
                         break
+                if c.strict_ghost and behind and abs(vb - va) < max(200.0, 0.4 * abs(va)) and range_corr(a, b) > c.ghost_corr:
+                    cond = True; of = a.id
+                    break
             b.suspect = sus
             b.ghost_t += dt if cond else -dt
             b.ghost_t = max(0.0, min(3.0, b.ghost_t))
@@ -193,7 +240,7 @@ class Tracker:
                 continue
             hits = _popcount5(t.hist)
             if t.st == TENTATIVE:
-                clutter_cell = self.cell_score(t.x, t.y) > 128
+                clutter_cell = not c.no_clutter and self.cell_score(t.x, t.y) > 128
                 wait = t.suspect and t.age < c.ghost_s + 0.5
                 if hits >= c.confirm_hits and not wait:
                     t.st = CLUTTER if clutter_cell else CONFIRMED
@@ -215,7 +262,7 @@ class Tracker:
                 t.ax, t.ay, t.still = t.sx, t.sy, 0.0
                 if t.st == CLUTTER:
                     t.st = CONFIRMED
-            elif t.unseen < 0.5:
+            elif t.unseen < 0.5 and not c.no_clutter:
                 t.still += dt
                 need = 3.0 if self.cell_score(t.sx, t.sy) > 128 else c.clutter_s
                 if t.still > need and t.st in (CONFIRMED, TENTATIVE):

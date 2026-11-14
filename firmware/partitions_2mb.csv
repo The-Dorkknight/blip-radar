@@ -1,0 +1,8 @@
+# Blip partition table: fits any ESP32-C3/S3 with 2 MB flash or more (larger chips just leave the rest unused).
+# No OTA (firmware goes on over USB), so the app gets 1.875 MB; Blip is about 1.1-1.3 MB.
+# NVS sits where huge_app.csv put it, so a C3 keeps its saved settings across this change.
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x5000
+phy_init, data, phy,      0xe000,   0x1000
+factory,  app,  factory,  0x10000,  0x1E0000
+coredump, data, coredump, 0x1F0000, 0x10000

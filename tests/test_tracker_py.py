@@ -55,25 +55,28 @@ def main():
                     os.path.join(ROOT, "tests", "tracker_replay.cpp"), "-o", exe], check=True)
     frames = scene()
     inp = "\n".join(" ".join(f"{x} {y} {v}" for x, y, v in fr) for fr in frames) + "\n"
-    out = subprocess.run([exe], input=inp, capture_output=True, text=True, check=True).stdout.splitlines()
-
-    T = tracker_py.Tracker()
-    same = worst = 0
-    for fr, line in zip(frames, out):
-        T.update(fr, 0.05)
-        py = T.visible()
-        nums = [int(v) for v in line.split()]
-        cc = [(nums[i], nums[i + 1], nums[i + 2]) for i in range(0, len(nums), 3)]
-        if [p[0] for p in py] == [c[0] for c in cc]:
-            same += 1
-            for p, c in zip(py, cc):
-                worst = max(worst, abs(p[1] - c[1]), abs(p[2] - c[2]))
-    pct = 100.0 * same / len(frames)
     fails = 0
-    ok = pct >= 99.0
-    print(("PASS  " if ok else "FAIL  ") + f"same visible ids in {pct:.2f}% of {len(frames)} frames"); fails += not ok
-    ok = worst <= 20
-    print(("PASS  " if ok else "FAIL  ") + f"positions agree within {worst} mm where ids match"); fails += not ok
+    for flags in ([], ["strict"], ["noclutter"]):
+        out = subprocess.run([exe] + flags, input=inp, capture_output=True, text=True, check=True).stdout.splitlines()
+        T = tracker_py.Tracker()
+        T.cfg.strict_ghost = "strict" in flags
+        T.cfg.no_clutter = "noclutter" in flags
+        same = worst = 0
+        for fr, line in zip(frames, out):
+            T.update(fr, 0.05)
+            py = T.visible()
+            nums = [int(v) for v in line.split()]
+            cc = [(nums[i], nums[i + 1], nums[i + 2]) for i in range(0, len(nums), 3)]
+            if [p[0] for p in py] == [c[0] for c in cc]:
+                same += 1
+                for p, c in zip(py, cc):
+                    worst = max(worst, abs(p[1] - c[1]), abs(p[2] - c[2]))
+        pct = 100.0 * same / len(frames)
+        tag = "+".join(flags) or "default"
+        ok = pct >= 99.0
+        print(("PASS  " if ok else "FAIL  ") + f"[{tag}] same visible ids in {pct:.2f}% of {len(frames)} frames"); fails += not ok
+        ok = worst <= 20
+        print(("PASS  " if ok else "FAIL  ") + f"[{tag}] positions agree within {worst} mm where ids match"); fails += not ok
     print("\nRESULT:", "FAIL" if fails else "PASS", f"({fails} failures)")
     return 1 if fails else 0
 
